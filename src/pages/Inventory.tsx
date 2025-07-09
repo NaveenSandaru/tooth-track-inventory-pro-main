@@ -391,7 +391,7 @@ const Inventory = () => {
                   <Input name="unit" placeholder="e.g., boxes, pieces, tubes" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="unitPrice">Unit Price ($)</Label>
+                  <Label htmlFor="unitPrice">Unit Price (Rs. )</Label>
                   <Input name="unitPrice" type="number" step="0.01" placeholder="0.00" />
                 </div>
                 <div className="space-y-2">
@@ -517,7 +517,7 @@ const Inventory = () => {
                     <div>
                       <p className="text-gray-600">Unit Price</p>
                       <p className="font-semibold text-dental-dark">
-                        ${item.unit_price || '0.00'}
+                        Rs. {item.unit_price || '0.00'}
                       </p>
                     </div>
                     <div>
@@ -597,7 +597,7 @@ const Inventory = () => {
                         <td className="p-4">
                           <span className="font-medium">{item.minimum_stock}</span> {item.unit_of_measurement || 'units'}
                         </td>
-                        <td className="p-4 font-medium">${item.unit_price || '0.00'}</td>
+                        <td className="p-4 font-medium">Rs. {item.unit_price || '0.00'}</td>
                         <td className="p-4">{getStatusBadge(item)}</td>
                         <td className="p-4 text-gray-900">{item.barcode || item.qr_code || 'N/A'}</td>
                         <td className="p-4">
@@ -703,7 +703,7 @@ const Inventory = () => {
               <p><b>Category:</b> {selectedItem.category_id ? getCategoryDisplayName(selectedItem.category_id) : 'Uncategorized'}</p>
               <p><b>Stock:</b> {selectedItem.current_stock}</p>
               <p><b>Min. Stock:</b> {selectedItem.minimum_stock}</p>
-              <p><b>Unit Price:</b> ${selectedItem.unit_price}</p>
+              <p><b>Unit Price:</b> Rs. {selectedItem.unit_price}</p>
               <p><b>Location:</b> {selectedItem.location}</p>
               <p><b>Barcode:</b> {selectedItem.barcode}</p>
             </div>
@@ -783,7 +783,7 @@ const Inventory = () => {
                 <Input name="unit" defaultValue={selectedItem.unit_of_measurement || ''} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="unitPrice">Unit Price ($)</Label>
+                <Label htmlFor="unitPrice">Unit Price (Rs. )</Label>
                 <Input name="unitPrice" type="number" step="0.01" defaultValue={selectedItem.unit_price || 0} />
               </div>
               <div className="space-y-2">
