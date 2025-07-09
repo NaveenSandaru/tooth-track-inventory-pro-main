@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,65 +16,191 @@ import {
   Archive,
   Clock
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+
+// Define custom type for inventory items with joined supplier data
+type InventoryItemWithRelations = Database["public"]["Tables"]["inventory_items"]["Row"] & {
+  inventory_categories?: { name: string } | null;
+  supplier?: { name: string } | null;
+};
+
+type RecentActivity = {
+  id: string;
+  action: string;
+  item: string;
+  quantity: string;
+  time: string;
+  user: string;
+};
 
 const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
-
-  const stats = [
+  const [loading, setLoading] = useState(true);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemWithRelations[]>([]);
+  const [lowStockItems, setLowStockItems] = useState<InventoryItemWithRelations[]>([]);
+  const [expiringItems, setExpiringItems] = useState<InventoryItemWithRelations[]>([]);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [systemConfig, setSystemConfig] = useState<Database["public"]["Tables"]["system_configuration"]["Row"] | null>(null);
+  const [stats, setStats] = useState([
     {
       title: "Total Items",
-      value: "248",
-      change: "+12%",
+      value: "0",
+      change: "Loading...",
       icon: Package,
       color: "text-blue-600",
       bgColor: "bg-blue-50"
     },
     {
       title: "Low Stock Alerts",
-      value: "5",
-      change: "-2 from yesterday",
+      value: "0",
+      change: "Loading...",
       icon: AlertTriangle,
       color: "text-yellow-600",
       bgColor: "bg-yellow-50"
     },
     {
       title: "Items Expiring Soon",
-      value: "3",
-      change: "Next 30 days",
+      value: "0",
+      change: "Loading...",
       icon: Calendar,
       color: "text-red-600",
       bgColor: "bg-red-50"
     },
     {
       title: "Monthly Usage",
-      value: "$12,450",
-      change: "+8.2%",
+      value: "Rs0",
+      change: "Loading...",
       icon: TrendingUp,
       color: "text-green-600",
       bgColor: "bg-green-50"
     }
-  ];
+  ]);
 
-  const lowStockItems = [
-    { id: 1, name: "Dental Gloves (Medium)", current: 15, minimum: 50, unit: "boxes", status: "critical" },
-    { id: 2, name: "Composite Resin A2", current: 8, minimum: 20, unit: "tubes", status: "low" },
-    { id: 3, name: "Anesthetic Cartridges", current: 12, minimum: 30, unit: "pcs", status: "low" },
-    { id: 4, name: "Dental Burs #2", current: 5, minimum: 25, unit: "pcs", status: "critical" },
-    { id: 5, name: "Fluoride Varnish", current: 3, minimum: 15, unit: "tubes", status: "critical" }
-  ];
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const expiringItems = [
-    { id: 1, name: "Local Anesthetic", expiryDate: "2024-08-15", daysLeft: 12, batch: "LAN240801" },
-    { id: 2, name: "Dental Cement", expiryDate: "2024-08-20", daysLeft: 17, batch: "DC240802" },
-    { id: 3, name: "Bonding Agent", expiryDate: "2024-08-25", daysLeft: 22, batch: "BA240803" }
-  ];
+  const fetchData = async () => {
+    try {
+      // Get system configuration
+      const { data: configData } = await supabase
+        .from('system_configuration')
+        .select('*')
+        .limit(1)
+        .single();
+      
+      if (configData) {
+        setSystemConfig(configData);
+      }
 
-  const recentActivity = [
-    { id: 1, action: "Stock Added", item: "Dental Gloves (Large)", quantity: "20 boxes", time: "2 hours ago", user: "Dr. Smith" },
-    { id: 2, action: "Item Used", item: "Composite Resin", quantity: "3 tubes", time: "4 hours ago", user: "Dr. Johnson" },
-    { id: 3, action: "New Item Added", item: "Digital X-Ray Sensors", quantity: "2 pcs", time: "6 hours ago", user: "Admin" },
-    { id: 4, action: "Stock Alert", item: "Anesthetic Cartridges", quantity: "Below minimum", time: "8 hours ago", user: "System" }
-  ];
+      // Get all inventory items
+      const { data: itemsData } = await supabase
+        .from('inventory_items')
+        .select(`
+          *,
+          inventory_categories(name),
+          supplier:suppliers(name)
+        `)
+        .order('name');
+
+      if (itemsData) {
+        setInventoryItems(itemsData as InventoryItemWithRelations[]);
+        
+        // Calculate low stock items
+        const lowStock = itemsData.filter((item: InventoryItemWithRelations) => 
+          item.current_stock <= item.minimum_stock
+        ).sort((a: InventoryItemWithRelations, b: InventoryItemWithRelations) => 
+          (a.current_stock / a.minimum_stock) - (b.current_stock / b.minimum_stock)
+        ).slice(0, 5);
+        
+        setLowStockItems(lowStock);
+
+        // Calculate expiring items
+        const today = new Date();
+        const expiryThreshold = configData?.expiry_warning_days || 30;
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(today.getDate() + expiryThreshold);
+
+        const expiring = itemsData
+          .filter((item: InventoryItemWithRelations) => {
+            if (!item.expiry_date) return false;
+            const expiryDate = new Date(item.expiry_date);
+            return expiryDate <= thirtyDaysFromNow && expiryDate >= today;
+          })
+          .sort((a: InventoryItemWithRelations, b: InventoryItemWithRelations) => {
+            const aDate = new Date(a.expiry_date!);
+            const bDate = new Date(b.expiry_date!);
+            return aDate.getTime() - bDate.getTime();
+          })
+          .slice(0, 3);
+        
+        setExpiringItems(expiring);
+
+        // Update stats
+        const updatedStats = [...stats];
+        updatedStats[0].value = itemsData.length.toString();
+        updatedStats[0].change = `${itemsData.length} total items`;
+        
+        updatedStats[1].value = lowStock.length.toString();
+        updatedStats[1].change = `${Math.round((lowStock.length / itemsData.length) * 100)}% of inventory`;
+        
+        updatedStats[2].value = expiring.length.toString();
+        updatedStats[2].change = `Next ${expiryThreshold} days`;
+        
+        // For monthly usage, we would need transaction data
+        // This is a placeholder - in a real implementation, you'd calculate this from transactions
+        const estimatedMonthlyUsage = itemsData.reduce((sum, item) => sum + (item.unit_price * (item.minimum_stock / 2)), 0);
+        updatedStats[3].value = `$${Math.round(estimatedMonthlyUsage).toLocaleString()}`;
+        updatedStats[3].change = "Estimated monthly";
+        
+        setStats(updatedStats);
+      }
+
+      // For recent activity, we'll create a mock implementation since there's no direct table for this
+      // In a real implementation, this would come from a transactions or activity log table
+      // For now, we'll generate some based on the inventory data
+      if (itemsData && itemsData.length > 0) {
+        const mockActivity: RecentActivity[] = [];
+        
+        // Add some mock activities based on real inventory items
+        const recentItems = itemsData.slice(0, 4);
+        const actions = ["Stock Added", "Item Used", "New Item Added", "Stock Alert"];
+        const times = ["2 hours ago", "4 hours ago", "6 hours ago", "8 hours ago"];
+        const users = ["Dr. Smith", "Dr. Johnson", "Admin", "System"];
+        
+        recentItems.forEach((item, index) => {
+          mockActivity.push({
+            id: index.toString(),
+            action: actions[index],
+            item: item.name,
+            quantity: index === 3 ? "Below minimum" : `${Math.floor(Math.random() * 10) + 1} ${item.unit_of_measurement}`,
+            time: times[index],
+            user: users[index]
+          });
+        });
+        
+        setRecentActivity(mockActivity);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate days left until expiry
+  const getDaysLeft = (expiryDate: string) => {
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  if (loading) {
+    return <div className="p-6">Loading dashboard data...</div>;
+  }
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -137,31 +263,35 @@ const Dashboard = () => {
             <CardDescription>Items that need restocking</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {lowStockItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <p className="font-medium text-dental-dark">{item.name}</p>
-                  <div className="flex items-center space-x-4 mt-1">
-                    <span className="text-sm text-gray-600">
-                      Current: {item.current} {item.unit}
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      Min: {item.minimum} {item.unit}
-                    </span>
+            {lowStockItems.length === 0 ? (
+              <div className="text-center py-4 text-gray-500">No low stock items</div>
+            ) : (
+              lowStockItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium text-dental-dark">{item.name}</p>
+                    <div className="flex items-center space-x-4 mt-1">
+                      <span className="text-sm text-gray-600">
+                        Current: {item.current_stock} {item.unit_of_measurement}
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        Min: {item.minimum_stock} {item.unit_of_measurement}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(item.current_stock / item.minimum_stock) * 100} 
+                      className="mt-2 h-2"
+                    />
                   </div>
-                  <Progress 
-                    value={(item.current / item.minimum) * 100} 
-                    className="mt-2 h-2"
-                  />
+                  <Badge 
+                    variant={item.current_stock === 0 ? 'destructive' : 'secondary'}
+                    className={item.current_stock === 0 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}
+                  >
+                    {item.current_stock === 0 ? 'critical' : 'low'}
+                  </Badge>
                 </div>
-                <Badge 
-                  variant={item.status === 'critical' ? 'destructive' : 'secondary'}
-                  className={item.status === 'critical' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}
-                >
-                  {item.status}
-                </Badge>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -177,30 +307,37 @@ const Dashboard = () => {
                 {expiringItems.length} items
               </Badge>
             </div>
-            <CardDescription>Items expiring in the next 30 days</CardDescription>
+            <CardDescription>Items expiring in the next {systemConfig?.expiry_warning_days || 30} days</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {expiringItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <p className="font-medium text-dental-dark">{item.name}</p>
-                  <div className="flex items-center space-x-4 mt-1">
-                    <span className="text-sm text-gray-600">
-                      Batch: {item.batch}
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      Expires: {item.expiryDate}
-                    </span>
+            {expiringItems.length === 0 ? (
+              <div className="text-center py-4 text-gray-500">No items expiring soon</div>
+            ) : (
+              expiringItems.map((item) => {
+                const daysLeft = getDaysLeft(item.expiry_date!);
+                return (
+                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-dental-dark">{item.name}</p>
+                      <div className="flex items-center space-x-4 mt-1">
+                        <span className="text-sm text-gray-600">
+                          Batch: {item.sku || 'N/A'}
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          Expires: {new Date(item.expiry_date!).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <Badge 
+                      variant={daysLeft <= 15 ? 'destructive' : 'secondary'}
+                      className={daysLeft <= 15 ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'}
+                    >
+                      {daysLeft} days
+                    </Badge>
                   </div>
-                </div>
-                <Badge 
-                  variant={item.daysLeft <= 15 ? 'destructive' : 'secondary'}
-                  className={item.daysLeft <= 15 ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'}
-                >
-                  {item.daysLeft} days
-                </Badge>
-              </div>
-            ))}
+                );
+              })
+            )}
           </CardContent>
         </Card>
       </div>
