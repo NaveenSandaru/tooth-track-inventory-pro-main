@@ -62,7 +62,14 @@ const PurchaseOrders = () => {
 
       if (poResponse.data) setPurchaseOrders(poResponse.data);
       if (suppliersResponse.data) setSuppliers(suppliersResponse.data);
-      if (itemsResponse.data) setInventoryItems(itemsResponse.data);
+      if (itemsResponse.data) {
+        console.log('Inventory items data structure:', itemsResponse.data);
+        // Log a sample item to see its structure
+        if (itemsResponse.data.length > 0) {
+          console.log('Sample inventory item:', itemsResponse.data[0]);
+        }
+        setInventoryItems(itemsResponse.data);
+      }
       if (categoriesResponse.data) setCategories(categoriesResponse.data);
 
       console.log('Data loaded successfully:');
