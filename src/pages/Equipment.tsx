@@ -334,7 +334,7 @@ const Equipment = () => {
                 <Input name="purchaseDate" type="date" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="purchasePrice">Purchase Price ($)</Label>
+                <Label htmlFor="purchasePrice">Purchase Price (Rs.)</Label>
                 <Input name="purchasePrice" type="number" step="0.01" placeholder="0.00" />
               </div>
               <div className="space-y-2">
@@ -434,7 +434,7 @@ const Equipment = () => {
                 {item.purchase_price && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Value:</span>
-                    <span className="font-medium">${item.purchase_price}</span>
+                    <span className="font-medium">Rs. {item.purchase_price}</span>
                   </div>
                 )}
               </div>
@@ -551,7 +551,7 @@ const Equipment = () => {
                 <Input name="performedBy" placeholder="Technician name" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cost">Cost ($)</Label>
+                <Label htmlFor="cost">Cost (Rs.)</Label>
                 <Input name="cost" type="number" step="0.01" placeholder="0.00" />
               </div>
             </div>
@@ -611,7 +611,7 @@ const Equipment = () => {
             </div>
             <div className="space-y-2">
               <Label>Purchase Price</Label>
-              <div className="p-2 bg-gray-50 rounded">{viewEquipmentData?.purchase_price ? `$${viewEquipmentData.purchase_price}` : '-'}</div>
+              <div className="p-2 bg-gray-50 rounded">{viewEquipmentData?.purchase_price ? `Rs. ${viewEquipmentData.purchase_price}` : '-'}</div>
             </div>
             <div className="space-y-2">
               <Label>Location</Label>
@@ -658,7 +658,7 @@ const Equipment = () => {
                         <td className="px-2 py-1 border">{m.maintenance_type}</td>
                         <td className="px-2 py-1 border max-w-[120px] truncate">{m.description}</td>
                         <td className="px-2 py-1 border">{m.performed_by}</td>
-                        <td className="px-2 py-1 border">{m.cost ? `$${m.cost}` : '-'}</td>
+                        <td className="px-2 py-1 border">{m.cost ? `Rs. ${m.cost}` : '-'}</td>
                         <td className="px-2 py-1 border">{m.next_maintenance_date || '-'}</td>
                         <td className="px-2 py-1 border max-w-[120px] truncate">{m.notes}</td>
                         <td className="px-2 py-1 border">
@@ -751,7 +751,7 @@ const Equipment = () => {
               <Input name="purchaseDate" type="date" defaultValue={editEquipmentData?.purchase_date || ''} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="purchasePrice">Purchase Price ($)</Label>
+              <Label htmlFor="purchasePrice">Purchase Price (Rs.)</Label>
               <Input name="purchasePrice" type="number" step="0.01" defaultValue={editEquipmentData?.purchase_price || ''} />
             </div>
             <div className="space-y-2">
