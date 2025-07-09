@@ -54,7 +54,7 @@ export function AppSidebar() {
         <div className="flex items-center justify-center">
           <img src="/placeholder.svg" alt="DentalTrack Pro Logo" className="h-36 w-36 object-contain" />
         </div>
-        <SidebarTrigger className="absolute -right-3 top-6 bg-white border border-gray-200 rounded-full p-1 shadow-sm" />
+        
       </div>
 
       <SidebarContent className="px-2 py-4">
