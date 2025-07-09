@@ -227,6 +227,72 @@ INSERT INTO public.inventory_items (name, description, sku, current_stock, minim
 ('Dental Mirror', 'Stainless steel dental mirror', 'MIRROR-001', 25, 5, 'pieces', 15.00, (SELECT id FROM public.suppliers WHERE name = 'Dental Instruments Inc.' LIMIT 1), 'Storage B')
 ON CONFLICT (sku) DO NOTHING;
 
+-- Update inventory items with categories
+UPDATE public.inventory_items
+SET category_id = (
+  SELECT id FROM public.inventory_categories WHERE name = 'Consumables'
+)
+WHERE name IN ('Dental Floss', 'Toothpaste');
+
+UPDATE public.inventory_items
+SET category_id = (
+  SELECT id FROM public.inventory_categories WHERE name = 'Instruments'
+)
+WHERE name IN ('Dental Mirror');
+
+-- Add more sample inventory items with categories
+INSERT INTO public.inventory_items (
+  name, 
+  description, 
+  sku, 
+  current_stock, 
+  minimum_stock, 
+  unit_of_measurement, 
+  unit_price, 
+  supplier_id,
+  category_id,
+  location
+) VALUES
+-- PPE Category
+(
+  'Disposable Gloves', 
+  'Latex-free examination gloves', 
+  'PPE-001', 
+  500, 
+  100, 
+  'box', 
+  9.99,
+  (SELECT id FROM public.suppliers WHERE name = 'Medical Equipment Plus' LIMIT 1),
+  (SELECT id FROM public.inventory_categories WHERE name = 'PPE'),
+  'Storage A'
+),
+-- Restorative Category
+(
+  'Composite Filling', 
+  'Light-cured composite resin', 
+  'REST-001', 
+  30, 
+  10, 
+  'units', 
+  45.00,
+  (SELECT id FROM public.suppliers WHERE name = 'Dental Supply Co.' LIMIT 1),
+  (SELECT id FROM public.inventory_categories WHERE name = 'Restorative'),
+  'Storage B'
+),
+-- Anesthetics Category
+(
+  'Local Anesthetic', 
+  'Lidocaine 2% with epinephrine', 
+  'ANES-001', 
+  50, 
+  20, 
+  'box', 
+  29.99,
+  (SELECT id FROM public.suppliers WHERE name = 'Dental Supply Co.' LIMIT 1),
+  (SELECT id FROM public.inventory_categories WHERE name = 'Anesthetics'),
+  'Storage C'
+);
+
 -- Step 14: Create helper functions
 CREATE OR REPLACE FUNCTION generate_po_number()
 RETURNS TEXT AS $$

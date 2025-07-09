@@ -146,57 +146,74 @@ export const PurchaseOrderForm = ({
   const updateOrderItem = (id: string, field: keyof OrderItem, value: any) => {
     console.log(`Updating item ${id}, field ${field} to value:`, value);
     
-    setOrderItems(orderItems.map(item => {
-      if (item.id === id) {
-        const updatedItem = { ...item, [field]: value };
-        
-        // Auto-calculate total price
-        if (field === 'quantity' || field === 'unit_price') {
-          updatedItem.total_price = updatedItem.quantity * updatedItem.unit_price;
-        }
-        
-        // Auto-populate from inventory item
-        if (field === 'inventory_item_id' && value) {
-          console.log('Selected inventory item ID:', value);
-          const selectedItem = inventoryItems.find(inv => inv.id === value);
-          console.log('Found inventory item:', selectedItem);
-          if (selectedItem) {
-            updatedItem.item_code = selectedItem.sku || '';
-            updatedItem.item_description = selectedItem.name;
-            updatedItem.category = selectedItem.category_id || '';
-            updatedItem.unit_of_measure = selectedItem.unit_of_measurement;
-            updatedItem.unit_price = selectedItem.unit_price;
-            updatedItem.total_price = updatedItem.quantity * selectedItem.unit_price;
-          }
-        }
-        
-        // Only clear inventory item when category changes and it's different from the item's category
-        if (field === 'category') {
-          // Find the current inventory item
-          const currentInventoryItem = item.inventory_item_id ? 
-            inventoryItems.find(inv => inv.id === item.inventory_item_id) : null;
+    setOrderItems(prevItems => {
+      return prevItems.map(item => {
+        if (item.id === id) {
+          const updatedItem = { ...item, [field]: value };
           
-          // If we have a current inventory item and its category doesn't match the new category, clear it
-          if (currentInventoryItem && currentInventoryItem.category_id !== value) {
-            updatedItem.inventory_item_id = '';
-            updatedItem.item_code = '';
-            updatedItem.item_description = '';
-            updatedItem.unit_price = 0;
-            updatedItem.total_price = 0;
+          // Auto-calculate total price
+          if (field === 'quantity' || field === 'unit_price') {
+            updatedItem.total_price = Number(updatedItem.quantity || 0) * Number(updatedItem.unit_price || 0);
           }
+          
+          // Auto-populate from inventory item
+          if (field === 'inventory_item_id' && value) {
+            console.log('Selected inventory item ID:', value);
+            const selectedItem = inventoryItems.find(inv => inv.id === value);
+            console.log('Found inventory item:', selectedItem);
+            
+            if (selectedItem) {
+              updatedItem.item_code = selectedItem.sku || '';
+              updatedItem.item_description = selectedItem.description || selectedItem.name;
+              updatedItem.category = selectedItem.category_id || '';
+              updatedItem.unit_of_measure = selectedItem.unit_of_measurement;
+              updatedItem.unit_price = Number(selectedItem.unit_price) || 0;
+              updatedItem.total_price = Number(updatedItem.quantity || 1) * Number(selectedItem.unit_price || 0);
+              
+              console.log('Updated item with inventory data:', updatedItem);
+            } else {
+              console.warn('Selected inventory item not found in inventory items list');
+              // Reset fields if item not found
+              updatedItem.item_code = '';
+              updatedItem.item_description = '';
+              updatedItem.unit_price = 0;
+              updatedItem.total_price = 0;
+            }
+          }
+          
+          // Only clear inventory item when category changes and it's different from the item's category
+          if (field === 'category' && value !== item.category) {
+            const currentInventoryItem = inventoryItems.find(inv => inv.id === item.inventory_item_id);
+            if (currentInventoryItem && currentInventoryItem.category_id !== value) {
+              updatedItem.inventory_item_id = '';
+              updatedItem.item_code = '';
+              updatedItem.item_description = '';
+              updatedItem.unit_price = 0;
+              updatedItem.total_price = 0;
+            }
+          }
+          
+          console.log('Final updated item:', updatedItem);
+          return updatedItem;
         }
-        
-        console.log('Updated item:', updatedItem);
-        return updatedItem;
-      }
-      return item;
-    }));
+        return item;
+      });
+    });
   };
 
   // Get filtered inventory items based on selected category
   const getFilteredInventoryItems = (categoryId: string) => {
-    if (!categoryId) return inventoryItems;
-    return inventoryItems.filter(item => item.category_id === categoryId);
+    console.log('Filtering inventory items for category:', categoryId);
+    console.log('Available inventory items:', inventoryItems);
+    
+    if (!categoryId) {
+      console.log('No category selected, returning all items');
+      return inventoryItems;
+    }
+    
+    const filtered = inventoryItems.filter(item => item.category_id === categoryId);
+    console.log('Filtered items:', filtered);
+    return filtered;
   };
 
   const getTotalAmount = () => {
@@ -250,10 +267,10 @@ export const PurchaseOrderForm = ({
         payment_terms: formData.payment_terms,
         shipping_method: formData.shipping_method,
         delivery_address: formData.delivery_address,
-        authorized_by: formData.authorized_by || null,
-        notes: formData.notes,
+        notes: formData.notes || '',
         total_amount: getTotalAmount(),
-        status: 'pending'
+        status: 'pending',
+        order_date: new Date().toISOString().split('T')[0] // Add current date
       };
       
       console.log('Creating purchase order with payload:', poPayload);
@@ -265,21 +282,26 @@ export const PurchaseOrderForm = ({
 
       if (poError) {
         console.error('Purchase order creation error:', poError);
-        throw poError;
+        throw new Error(`Failed to create purchase order: ${poError.message}`);
       }
+      
+      if (!purchaseOrder) {
+        throw new Error('Purchase order was not created');
+      }
+      
       console.log('Purchase order created:', purchaseOrder);
 
       // Create purchase order items
       const itemsToInsert = orderItems.map(item => ({
         purchase_order_id: purchaseOrder.id,
-        inventory_item_id: item.inventory_item_id || null,
-        item_code: item.item_code,
-        item_description: item.item_description,
-        category: item.category,
-        quantity: item.quantity,
+        inventory_item_id: item.inventory_item_id,
+        quantity: Number(item.quantity),
+        unit_price: Number(item.unit_price),
         unit_of_measure: item.unit_of_measure,
-        unit_price: item.unit_price,
-        remarks: item.remarks
+        item_code: item.item_code || null,
+        item_description: item.item_description || null,
+        category: item.category || null,
+        remarks: item.remarks || null
       }));
 
       console.log('Creating purchase order items:', itemsToInsert);
@@ -289,8 +311,14 @@ export const PurchaseOrderForm = ({
 
       if (itemsError) {
         console.error('Purchase order items creation error:', itemsError);
-        throw itemsError;
+        // Rollback purchase order if items creation fails
+        await supabase
+          .from('purchase_orders')
+          .delete()
+          .eq('id', purchaseOrder.id);
+        throw new Error(`Failed to create purchase order items: ${itemsError.message}`);
       }
+      
       console.log('Purchase order items created successfully');
 
       toast({
@@ -309,7 +337,6 @@ export const PurchaseOrderForm = ({
         payment_terms: '',
         shipping_method: '',
         delivery_address: '',
-        authorized_by: '',
         notes: ''
       });
       setOrderItems([{
@@ -329,7 +356,7 @@ export const PurchaseOrderForm = ({
       console.error('Error creating purchase order:', error);
       toast({
         title: "Error",
-        description: "Failed to create purchase order. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create purchase order. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -526,40 +553,61 @@ export const PurchaseOrderForm = ({
                       {/* Removed duplicated select for inventory item */}
                       <Select
                         key={`inventory-select-${item.id}-${item.category}`}
-                        value={item.inventory_item_id || ""}
+                        defaultValue={item.inventory_item_id}
+                        value={item.inventory_item_id}
                         onValueChange={(value) => {
                           console.log("Selected inventory item:", value);
                           updateOrderItem(item.id, 'inventory_item_id', value);
                         }}
                       >
                         <SelectTrigger className={`w-full ${errors[`item_${index}_inventory`] ? "border-red-500" : ""}`}>
-                          {item.inventory_item_id ? (
-                            <div className="flex items-center">
-                              <span className="font-medium">
-                                {inventoryItems.find(invItem => invItem.id === item.inventory_item_id)?.name || "Select item"}
-                              </span>
-                              {item.inventory_item_id && (
-                                <Badge variant="outline" className="ml-2 text-xs">
-                                  {inventoryItems.find(invItem => invItem.id === item.inventory_item_id)?.sku || ""}
-                                </Badge>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">Select item</span>
-                          )}
+                          <SelectValue placeholder="Select item">
+                            {item.inventory_item_id ? (
+                              <div className="flex items-center">
+                                <span className="font-medium">
+                                  {inventoryItems.find(invItem => invItem.id === item.inventory_item_id)?.name || "Select item"}
+                                </span>
+                                {item.inventory_item_id && (
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    {inventoryItems.find(invItem => invItem.id === item.inventory_item_id)?.sku || ""}
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">Select item</span>
+                            )}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          {!item.category ? (
+                          {inventoryItems.length === 0 ? (
                             <div className="px-2 py-1.5 text-sm text-gray-500">
-                              Please select a category first
+                              No inventory items available
                             </div>
+                          ) : !item.category ? (
+                            // Show all items when no category is selected
+                            inventoryItems.map((invItem) => (
+                              <SelectItem 
+                                key={invItem.id} 
+                                value={invItem.id}
+                                textValue={invItem.name}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{invItem.name}</span>
+                                  {invItem.sku && <span className="text-xs text-gray-500 ml-2">({invItem.sku})</span>}
+                                </div>
+                              </SelectItem>
+                            ))
                           ) : getFilteredInventoryItems(item.category).length === 0 ? (
                             <div className="px-2 py-1.5 text-sm text-gray-500">
                               No items available in this category
                             </div>
                           ) : (
                             getFilteredInventoryItems(item.category).map((invItem) => (
-                              <SelectItem key={invItem.id} value={invItem.id}>
+                              <SelectItem 
+                                key={invItem.id} 
+                                value={invItem.id}
+                                textValue={invItem.name}
+                              >
                                 <div className="flex items-center justify-between w-full">
                                   <span>{invItem.name}</span>
                                   {invItem.sku && <span className="text-xs text-gray-500 ml-2">({invItem.sku})</span>}
