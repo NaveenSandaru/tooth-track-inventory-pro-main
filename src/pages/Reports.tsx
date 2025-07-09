@@ -1,134 +1,130 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  FileText, 
-  Download, 
-  Calendar, 
-  TrendingUp, 
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import {
+  FileText,
+  Download,
+  Calendar,
+  TrendingUp,
   TrendingDown,
   Package,
   AlertTriangle,
   DollarSign,
-  BarChart3
+  BarChart3,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+type InventoryCategory = {
+  id: string;
+  name: string;
+};
+
+type InventoryItem = {
+  id: string;
+  name: string;
+  description?: string;
+  current_stock: number;
+  unit_price: number;
+  minimum_stock?: number;
+  inventory_categories: InventoryCategory | null; // no longer an array
+};
+
+
+type UsageReport = {
+  categoryId: string;
+  category: string;
+  items: InventoryItem[];
+  totalValue: number;
+};
 
 const Reports = () => {
   const [dateRange, setDateRange] = useState("last_30_days");
   const [reportType, setReportType] = useState("inventory");
+  const [isFetchingStockReports, setIsFetchingStockReports] = useState(false);
+  const [isFetchingUsageReports, setIsFetchingUsageReports] = useState(false);
+  const [isFetchingPurchaseReports, setIsFetchingPurchaseReports] = useState(false);
+  const [stockReports, setStockReports] = useState([{
+    id: "",
+    name: "",
+    description: "",
+    current_stock: 0,
+    minimum_stock: 0,
+    type: "warning"
 
-  const stockReports = [
-    {
-      id: 1,
-      name: "Low Stock Items Report",
-      description: "Items below minimum stock levels",
-      count: 5,
-      lastGenerated: "2024-07-08",
-      type: "critical"
+  }]);
+  const [usageReports, setUsageReports] = useState<UsageReport[]>([]);
+  const [purchaseReports, setPurchaseReports] = useState<{
+    supplier: string;
+    status: string;
+    totalOrders: number;
+    totalAmount: number;
+    lastOrder: string;
+  }[]>([]);
+  const [quickStats, setQuickStats] = useState({
+    totalInventoryValue: 0,
+    itemsConsumed: 0,
+    purchaseOrders: 0,
+    alertItems: {
+      lowStock: 0,
+      expiring: 0,
     },
-    {
-      id: 2,
-      name: "Expiring Items Report",
-      description: "Items expiring in next 30 days",
-      count: 3,
-      lastGenerated: "2024-07-08",
-      type: "warning"
-    },
-    {
-      id: 3,
-      name: "Out of Stock Report",
-      description: "Items currently out of stock",
-      count: 1,
-      lastGenerated: "2024-07-07",
-      type: "critical"
-    },
-    {
-      id: 4,
-      name: "Stock Valuation Report",
-      description: "Total inventory value by category",
-      count: null,
-      lastGenerated: "2024-07-05",
-      type: "info"
-    }
-  ];
+  });
 
-  const usageReports = [
-    {
-      category: "PPE & Safety",
-      itemsUsed: 245,
-      totalValue: 3150.75,
-      change: 12.5,
-      trend: "up"
-    },
-    {
-      category: "Restorative Materials",
-      itemsUsed: 89,
-      totalValue: 4250.30,
-      change: -5.2,
-      trend: "down"
-    },
-    {
-      category: "Anesthetics",
-      itemsUsed: 156,
-      totalValue: 875.60,
-      change: 8.9,
-      trend: "up"
-    },
-    {
-      category: "Instruments",
-      itemsUsed: 67,
-      totalValue: 2100.45,
-      change: 3.1,
-      trend: "up"
-    }
-  ];
 
-  const purchaseReports = [
-    {
-      supplier: "MedSupply Co.",
-      totalOrders: 12,
-      totalAmount: 15750.00,
-      lastOrder: "2024-07-05",
-      status: "active"
-    },
-    {
-      supplier: "DentaCorp",
-      totalOrders: 8,
-      totalAmount: 12400.50,
-      lastOrder: "2024-06-28",
-      status: "active"
-    },
-    {
-      supplier: "AnestheCare Ltd.",
-      totalOrders: 6,
-      totalAmount: 5250.75,
-      lastOrder: "2024-07-02",
-      status: "active"
-    },
-    {
-      supplier: "Precision Tools",
-      totalOrders: 4,
-      totalAmount: 3800.25,
-      lastOrder: "2024-06-15",
-      status: "pending"
-    }
-  ];
+  const downloadStockReportPDF = () => {
+    const doc = new jsPDF();
+    const today = new Date();
+    const issuedDate = today.toLocaleDateString('en-GB'); // format: DD/MM/YYYY
 
-  const monthlyTrends = [
-    { month: "Jan", consumption: 12500, orders: 8, value: 15600 },
-    { month: "Feb", consumption: 11800, orders: 6, value: 14200 },
-    { month: "Mar", consumption: 13200, orders: 9, value: 16800 },
-    { month: "Apr", consumption: 12900, orders: 7, value: 15900 },
-    { month: "May", consumption: 14100, orders: 10, value: 18200 },
-    { month: "Jun", consumption: 13500, orders: 8, value: 17100 },
-    { month: "Jul", consumption: 15200, orders: 11, value: 19500 }
-  ];
+    doc.text("Inventory Stock Report", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Issued on: ${issuedDate}`, 14, 22); // placed just below the title
+
+    autoTable(doc, {
+      startY: 28, // moved down to make space for the issued date
+      head: [["Name", "Description", "Current Stock", "Minimum Stock"]],
+      body: stockReports.map((item) => [
+        item.name,
+        item.description || "-",
+        item.current_stock,
+        item.minimum_stock,
+      ]),
+    });
+
+    doc.save("stock_report.pdf");
+  };
+
+  const downloadSingleStockReportPDF = (item) => {
+    const doc = new jsPDF();
+    doc.text("Inventory Item Report", 14, 15);
+
+    autoTable(doc, {
+      startY: 25,
+      head: [["Field", "Value"]],
+      body: [
+        ["Issued Date", new Date().toISOString().split("T")[0]],
+        ["Name", item.name],
+        ["Description", item.description || "-"],
+        ["Current Stock", item.current_stock],
+        ["Minimum Stock", item.minimum_stock],
+        ["Status", item.type.charAt(0).toUpperCase() + item.type.slice(1)],
+      ],
+    });
+
+    doc.save(`${item.name}_report.pdf`);
+  };
+
+  const usagePercentage = (items) => {
+    const used = items.reduce((acc, item) => acc + (item.minimum_stock || 0), 0);
+    const total = items.reduce((acc, item) => acc + (item.current_stock || 0), 0);
+    return total ? Math.min(100, Math.round((used / total) * 100)) : 0;
+  };
 
   const getReportBadge = (type: string) => {
     switch (type) {
@@ -143,6 +139,262 @@ const Reports = () => {
     }
   };
 
+  const fetchStockReports = async () => {
+    setIsFetchingStockReports(true);
+    try {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('id, name, description, current_stock, minimum_stock');
+
+      if (error) {
+        console.error('Error fetching stock reports:', error.message);
+        return;
+      }
+
+      const formattedReports = data.map(item => {
+        let type = "info"; // Default if stock is fine
+
+        if (item.current_stock <= 0) {
+          type = "critical";
+        } else if (item.current_stock < item.minimum_stock) {
+          type = "warning";
+        }
+
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          current_stock: item.current_stock,
+          minimum_stock: item.minimum_stock,
+          type,
+        };
+      });
+
+      setStockReports(formattedReports);
+    } catch (err: any) {
+      console.error('Unexpected error:', err.message);
+    } finally {
+      setIsFetchingStockReports(false);
+    }
+  };
+
+  const fetchUsageReports = async () => {
+    setIsFetchingUsageReports(true);
+    try {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select(`
+        id,
+        name,
+        description,
+        current_stock,
+        unit_price,
+        minimum_stock,
+        inventory_categories:category_id (
+          id,
+          name
+        )
+      `);
+
+      if (error) {
+        console.error('Error fetching usage reports:', error.message);
+        return;
+      }
+
+      type InventoryCategory = {
+        id: string;
+        name: string;
+      };
+
+      type InventoryItem = {
+        id: string;
+        name: string;
+        description?: string;
+        current_stock: number;
+        unit_price: number;
+        minimum_stock?: number;
+        inventory_categories: InventoryCategory | null; // fixed
+      };
+
+      type UsageReport = {
+        categoryId: string;
+        category: string;
+        items: InventoryItem[];
+        totalValue: number;
+      };
+
+      const typedData = data as InventoryItem[];
+      const categoryMap = new Map<string, UsageReport>();
+
+      typedData.forEach(item => {
+        const category = item.inventory_categories;
+        if (!category) return;
+
+        if (!categoryMap.has(category.id)) {
+          categoryMap.set(category.id, {
+            categoryId: category.id,
+            category: category.name,
+            items: [],
+            totalValue: 0,
+          });
+        }
+
+        const entry = categoryMap.get(category.id)!;
+        const itemValue = (item.current_stock || 0) * parseFloat(item.unit_price?.toString() || "0");
+        entry.items.push(item);
+        entry.totalValue += itemValue;
+      });
+
+      const reports = Array.from(categoryMap.values());
+      setUsageReports(reports);
+    } catch (err: any) {
+      console.error('Unexpected error:', err.message);
+    } finally {
+      setIsFetchingUsageReports(false);
+    }
+  };
+
+  const fetchPurchaseReports = async () => {
+    setIsFetchingPurchaseReports(true);
+    try {
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select(`
+          id,
+          order_date,
+          total_amount,
+          status,
+          supplier_id,
+          suppliers (
+            id,
+            name,
+            status
+          )
+        `);
+
+      if (error) {
+        console.error("Error fetching purchase reports:", error.message);
+        return;
+      }
+
+      type Supplier = {
+        id: string;
+        name: string;
+        status: string;
+      };
+
+      type PurchaseOrder = {
+        id: string;
+        order_date: string;
+        total_amount: number;
+        status: string;
+        supplier_id: string;
+        suppliers: Supplier | null;
+      };
+
+      const supplierMap = new Map<string, {
+        supplier: string;
+        status: string;
+        totalOrders: number;
+        totalAmount: number;
+        lastOrder: string;
+      }>();
+
+      (data as PurchaseOrder[]).forEach(order => {
+        const supplier = order.suppliers;
+        if (!supplier) return;
+
+        const existing = supplierMap.get(supplier.id);
+
+        const orderDate = new Date(order.order_date).toLocaleDateString("en-GB", {
+          day: "2-digit", month: "short", year: "numeric"
+        });
+
+        if (!existing) {
+          supplierMap.set(supplier.id, {
+            supplier: supplier.name,
+            status: supplier.status,
+            totalOrders: 1,
+            totalAmount: order.total_amount || 0,
+            lastOrder: orderDate,
+          });
+        } else {
+          existing.totalOrders += 1;
+          existing.totalAmount += order.total_amount || 0;
+          const lastDate = new Date(existing.lastOrder);
+          if (new Date(order.order_date) > lastDate) {
+            existing.lastOrder = orderDate;
+          }
+        }
+      });
+
+      setPurchaseReports(Array.from(supplierMap.values()));
+    } catch (err: any) {
+      console.error("Unexpected error:", err.message);
+    } finally {
+      setIsFetchingPurchaseReports(false);
+    }
+  };
+
+  const fetchQuickStats = async () => {
+    try {
+      const { data: inventoryItems, error: inventoryError } = await supabase
+        .from("inventory_items")
+        .select("current_stock, unit_price, expiry_date");
+
+      if (inventoryError) throw inventoryError;
+
+      const now = new Date();
+      const expiryThreshold = new Date();
+      expiryThreshold.setDate(now.getDate() + 30);
+
+      let totalValue = 0;
+      let lowStock = 0;
+      let expiring = 0;
+
+      inventoryItems?.forEach((item: any) => {
+        const stock = item.current_stock || 0;
+        const price = parseFloat(item.unit_price) || 0;
+        totalValue += stock * price;
+
+        if (item.minimum_stock && stock < item.minimum_stock) lowStock++;
+
+        if (item.expiry_date && new Date(item.expiry_date) <= expiryThreshold) expiring++;
+      });
+
+      const { count: poCount, error: poError } = await supabase
+        .from("purchase_orders")
+        .select("*", { count: "exact", head: true });
+      if (poError) throw poError;
+
+      const itemsConsumed = inventoryItems?.reduce((acc, item: any) => {
+        const max = item.maximum_stock || 0;
+        const used = max - item.current_stock;
+        return used > 0 ? acc + used : acc;
+      }, 0);
+
+      setQuickStats({
+        totalInventoryValue: totalValue,
+        itemsConsumed,
+        purchaseOrders: poCount || 0,
+        alertItems: {
+          lowStock,
+          expiring,
+        },
+      });
+    } catch (err: any) {
+      console.error("Error fetching quick stats:", err.message);
+    }
+  };
+
+
+  useEffect(() => {
+    fetchStockReports();
+    fetchUsageReports();
+    fetchPurchaseReports();
+    fetchQuickStats();
+  }, [])
+
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       {/* Header */}
@@ -150,24 +402,6 @@ const Reports = () => {
         <div>
           <h1 className="text-3xl font-bold text-dental-dark">Reports & Analytics</h1>
           <p className="text-gray-600 mt-1">Analyze your inventory performance and trends</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-48">
-              <Calendar className="h-4 w-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="last_7_days">Last 7 Days</SelectItem>
-              <SelectItem value="last_30_days">Last 30 Days</SelectItem>
-              <SelectItem value="last_90_days">Last 90 Days</SelectItem>
-              <SelectItem value="last_year">Last Year</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button className="bg-dental-primary hover:bg-dental-secondary">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
         </div>
       </div>
 
@@ -178,14 +412,7 @@ const Reports = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Inventory Value</p>
-                <p className="text-2xl font-bold text-dental-dark">$47,520</p>
-                <p className="text-sm text-green-600 flex items-center mt-1">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  +5.2% from last month
-                </p>
-              </div>
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <DollarSign className="h-6 w-6 text-blue-600" />
+                <p className="text-2xl font-bold text-dental-dark">Rs. {quickStats.totalInventoryValue.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -196,11 +423,7 @@ const Reports = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Items Consumed</p>
-                <p className="text-2xl font-bold text-dental-dark">557</p>
-                <p className="text-sm text-green-600 flex items-center mt-1">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  +12.3% from last month
-                </p>
+                <p className="text-2xl font-bold text-dental-dark">{quickStats.itemsConsumed}</p>
               </div>
               <div className="bg-green-50 p-3 rounded-lg">
                 <Package className="h-6 w-6 text-green-600" />
@@ -214,11 +437,7 @@ const Reports = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Purchase Orders</p>
-                <p className="text-2xl font-bold text-dental-dark">30</p>
-                <p className="text-sm text-red-600 flex items-center mt-1">
-                  <TrendingDown className="h-3 w-3 mr-1" />
-                  -8.1% from last month
-                </p>
+                <p className="text-2xl font-bold text-dental-dark">{quickStats.purchaseOrders}</p>
               </div>
               <div className="bg-purple-50 p-3 rounded-lg">
                 <FileText className="h-6 w-6 text-purple-600" />
@@ -232,10 +451,12 @@ const Reports = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Alert Items</p>
-                <p className="text-2xl font-bold text-dental-dark">8</p>
+                <p className="text-2xl font-bold text-dental-dark">
+                  {quickStats.alertItems.lowStock + quickStats.alertItems.expiring}
+                </p>
                 <p className="text-sm text-yellow-600 flex items-center mt-1">
                   <AlertTriangle className="h-3 w-3 mr-1" />
-                  5 low stock, 3 expiring
+                  {quickStats.alertItems.lowStock} low stock, {quickStats.alertItems.expiring} expiring
                 </p>
               </div>
               <div className="bg-yellow-50 p-3 rounded-lg">
@@ -246,16 +467,26 @@ const Reports = () => {
         </Card>
       </div>
 
+
       {/* Reports Tabs */}
       <Tabs defaultValue="stock" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="stock">Stock Reports</TabsTrigger>
           <TabsTrigger value="usage">Usage Analytics</TabsTrigger>
           <TabsTrigger value="purchasing">Purchase Reports</TabsTrigger>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stock" className="space-y-6">
+          <div className="flex justify-end">
+            <button
+              onClick={downloadStockReportPDF}
+              className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm"
+            >
+              <Download size={16} />
+              <span>Download PDF</span>
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {stockReports.map((report) => (
               <Card key={report.id} className="card-hover">
@@ -265,30 +496,29 @@ const Reports = () => {
                       <CardTitle className="text-lg font-semibold">{report.name}</CardTitle>
                       <CardDescription className="mt-1">{report.description}</CardDescription>
                     </div>
-                    {getReportBadge(report.type)}
+
+                    <div className="flex items-center space-x-2">
+                      {getReportBadge(report.type)}
+
+                      {/* Single item download */}
+                      <button
+                        onClick={() => downloadSingleStockReportPDF(report)}
+                        className="hover:text-blue-600"
+                        title="Download Item Report"
+                      >
+                        <Download size={16} />
+                      </button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
-                    {report.count && (
+                    {report.current_stock && (
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-600">Items:</span>
-                        <span className="font-semibold text-dental-dark">{report.count}</span>
+                        <span className="font-semibold text-dental-dark">{report.current_stock}</span>
                       </div>
                     )}
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Calendar className="h-4 w-4" />
-                      <span>Last generated: {report.lastGenerated}</span>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      <FileText className="h-4 w-4 mr-1" />
-                      View Report
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Download className="h-4 w-4" />
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -309,30 +539,18 @@ const Reports = () => {
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-semibold text-dental-dark">{usage.category}</h4>
-                        <div className="flex items-center space-x-2">
-                          {usage.trend === "up" ? (
-                            <TrendingUp className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <TrendingDown className="h-4 w-4 text-red-600" />
-                          )}
-                          <span className={`text-sm font-medium ${
-                            usage.trend === "up" ? "text-green-600" : "text-red-600"
-                          }`}>
-                            {usage.change > 0 ? "+" : ""}{usage.change}%
-                          </span>
-                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-600">Items Used:</span>
-                          <span className="font-medium text-dental-dark ml-2">{usage.itemsUsed}</span>
+                          <span className="font-medium text-dental-dark ml-2">{usage.items.length}</span>
                         </div>
                         <div>
                           <span className="text-gray-600">Total Value:</span>
-                          <span className="font-medium text-dental-dark ml-2">${usage.totalValue.toFixed(2)}</span>
+                          <span className="font-medium text-dental-dark ml-2">Rs. {usage.totalValue.toFixed(2)}</span>
                         </div>
                       </div>
-                      <Progress value={75} className="mt-3 h-2" />
+                      <Progress value={usagePercentage(usage.items)} className="mt-3 h-2" />
                     </div>
                   </div>
                 ))}
@@ -364,12 +582,12 @@ const Reports = () => {
                       <tr key={index} className="hover:bg-gray-50">
                         <td className="p-4 font-medium text-dental-dark">{purchase.supplier}</td>
                         <td className="p-4">{purchase.totalOrders}</td>
-                        <td className="p-4 font-medium">${purchase.totalAmount.toFixed(2)}</td>
+                        <td className="p-4 font-medium">Rs. {purchase.totalAmount.toFixed(2)}</td>
                         <td className="p-4 text-gray-600">{purchase.lastOrder}</td>
                         <td className="p-4">
                           <Badge className={
-                            purchase.status === "active" 
-                              ? "bg-green-100 text-green-800" 
+                            purchase.status === "active"
+                              ? "bg-green-100 text-green-800"
                               : "bg-yellow-100 text-yellow-800"
                           }>
                             {purchase.status}
@@ -382,54 +600,6 @@ const Reports = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="trends" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Consumption Trend</CardTitle>
-                <CardDescription>Total inventory consumption over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {monthlyTrends.map((trend, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-600 w-12">{trend.month}</span>
-                      <div className="flex-1 mx-4">
-                        <Progress value={(trend.consumption / 20000) * 100} className="h-3" />
-                      </div>
-                      <span className="text-sm font-semibold text-dental-dark w-20 text-right">
-                        ${trend.consumption.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Purchase Order Trends</CardTitle>
-                <CardDescription>Monthly purchase order frequency</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {monthlyTrends.map((trend, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-600 w-12">{trend.month}</span>
-                      <div className="flex-1 mx-4">
-                        <Progress value={(trend.orders / 15) * 100} className="h-3" />
-                      </div>
-                      <span className="text-sm font-semibold text-dental-dark w-20 text-right">
-                        {trend.orders} orders
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
       </Tabs>
     </div>
