@@ -197,7 +197,38 @@ export const StockReceivingForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Basic validation
+    if (!formData.supplier_id) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a supplier",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.receipt_date) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a receipt date",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check if there are any items to receive
+    if (receivingItems.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "No items to receive. Please select a purchase order with items or add items manually",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
+      console.log('Starting stock receipt creation...');
+      
       // Upload files first
       const uploadPromises = [];
       const fileUrls: { [key: string]: string | null } = {};
@@ -224,65 +255,103 @@ export const StockReceivingForm = ({
       }
       
       await Promise.all(uploadPromises);
+      console.log('Files uploaded successfully:', fileUrls);
 
-      // Get the next receipt number
-      const { data: receiptNumberData } = await supabase.rpc('generate_receipt_number');
-      const receiptNumber = receiptNumberData || `REC${Date.now().toString().slice(-6)}`;
+      // Generate receipt number - either from RPC or fallback
+      let receiptNumber;
+      try {
+        const { data: receiptNumberData, error: rpcError } = await supabase.rpc('generate_receipt_number');
+        
+        if (rpcError) {
+          console.error('Error generating receipt number from RPC:', rpcError);
+          receiptNumber = `REC${Date.now().toString().slice(-6)}`;
+        } else {
+          receiptNumber = receiptNumberData || `REC${Date.now().toString().slice(-6)}`;
+        }
+      } catch (error) {
+        console.error('Exception in receipt number generation:', error);
+        receiptNumber = `REC${Date.now().toString().slice(-6)}`;
+      }
+      
+      console.log('Generated receipt number:', receiptNumber);
 
-      // Create stock receipt
+      // Create stock receipt - with explicit data type handling
+      const newStockReceipt = {
+        receipt_number: receiptNumber,
+        purchase_order_id: formData.purchase_order_id ? formData.purchase_order_id : null,
+        supplier_id: formData.supplier_id,
+        receipt_date: formData.receipt_date,
+        received_by: formData.received_by || null,
+        notes: formData.notes || '',
+        invoice_uploaded: !!uploadedFiles.invoice,
+        delivery_note_uploaded: !!uploadedFiles.deliveryNote,
+        qc_report_uploaded: !!uploadedFiles.qcReport,
+        invoice_url: fileUrls.invoice || null,
+        delivery_note_url: fileUrls.deliveryNote || null,
+        qc_report_url: fileUrls.qcReport || null
+      };
+      
+      console.log('Submitting stock receipt data:', newStockReceipt);
+      
       const { data: stockReceipt, error: receiptError } = await supabase
         .from('stock_receipts')
-        .insert([{
-          receipt_number: receiptNumber,
-          purchase_order_id: formData.purchase_order_id || null,
-          supplier_id: formData.supplier_id,
-          receipt_date: formData.receipt_date,
-          received_by: formData.received_by || null,
-          notes: formData.notes,
-          invoice_uploaded: !!uploadedFiles.invoice,
-          delivery_note_uploaded: !!uploadedFiles.deliveryNote,
-          qc_report_uploaded: !!uploadedFiles.qcReport,
-          invoice_url: fileUrls.invoice || null,
-          delivery_note_url: fileUrls.deliveryNote || null,
-          qc_report_url: fileUrls.qcReport || null
-        }])
+        .insert([newStockReceipt])
         .select()
         .single();
 
-      if (receiptError) throw receiptError;
+      if (receiptError) {
+        console.error('Error creating stock receipt:', receiptError);
+        throw receiptError;
+      }
+      
+      console.log('Stock receipt created successfully:', stockReceipt);
 
       // Create stock receipt items
       const itemsToInsert = receivingItems.map(item => ({
         stock_receipt_id: stockReceipt.id,
         inventory_item_id: item.inventory_item_id || null,
-        quantity: item.quantity_received,
-        quantity_ordered: item.quantity_ordered,
-        unit_of_measure: item.unit_of_measure,
+        quantity: Number(item.quantity_received), // Ensure proper number type
+        quantity_ordered: Number(item.quantity_ordered), // Ensure proper number type
+        unit_of_measure: item.unit_of_measure || 'units',
         batch_number: item.batch_number || null,
         lot_number: item.lot_number || null,
         manufacture_date: item.manufacture_date || null,
         expiry_date: item.expiry_date || null,
-        condition: item.condition,
+        condition: item.condition || 'good',
         storage_location: item.storage_location || null,
         remarks: item.remarks || null,
-        has_discrepancy: item.has_discrepancy
+        has_discrepancy: Boolean(item.has_discrepancy) // Ensure proper boolean type
       }));
+      
+      console.log('Submitting stock receipt items:', itemsToInsert);
 
       const { error: itemsError } = await supabase
         .from('stock_receipt_items')
         .insert(itemsToInsert);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Error creating stock receipt items:', itemsError);
+        throw itemsError;
+      }
+      
+      console.log('Stock receipt items created successfully');
 
       // Update PO status if linked
       if (formData.purchase_order_id) {
         const hasDiscrepancies = getDiscrepancyCount() > 0;
-        await supabase
+        const newStatus = 'received'; // Both cases use 'received' status
+        
+        console.log(`Updating PO status to ${newStatus}`);
+        
+        const { error: poUpdateError } = await supabase
           .from('purchase_orders')
-          .update({ 
-            status: hasDiscrepancies ? 'received' : 'received' 
-          })
+          .update({ status: newStatus })
           .eq('id', formData.purchase_order_id);
+          
+        if (poUpdateError) {
+          console.error('Error updating purchase order status:', poUpdateError);
+          // We don't throw here as this is not critical to the main flow
+        }
       }
 
       toast({

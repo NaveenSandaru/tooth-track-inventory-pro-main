@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
 
 interface PurchaseOrderFormProps {
   suppliers: any[];
@@ -143,47 +144,76 @@ export const PurchaseOrderForm = ({
   };
 
   const updateOrderItem = (id: string, field: keyof OrderItem, value: any) => {
-    setOrderItems(orderItems.map(item => {
-      if (item.id === id) {
-        const updatedItem = { ...item, [field]: value };
-        
-        // Auto-calculate total price
-        if (field === 'quantity' || field === 'unit_price') {
-          updatedItem.total_price = updatedItem.quantity * updatedItem.unit_price;
-        }
-        
-        // Auto-populate from inventory item
-        if (field === 'inventory_item_id' && value) {
-          const selectedItem = inventoryItems.find(inv => inv.id === value);
-          if (selectedItem) {
-            updatedItem.item_code = selectedItem.sku || '';
-            updatedItem.item_description = selectedItem.name;
-            updatedItem.category = selectedItem.category_id || '';
-            updatedItem.unit_of_measure = selectedItem.unit_of_measurement;
-            updatedItem.unit_price = selectedItem.unit_price;
-            updatedItem.total_price = updatedItem.quantity * selectedItem.unit_price;
+    console.log(`Updating item ${id}, field ${field} to value:`, value);
+    
+    setOrderItems(prevItems => {
+      return prevItems.map(item => {
+        if (item.id === id) {
+          const updatedItem = { ...item, [field]: value };
+          
+          // Auto-calculate total price
+          if (field === 'quantity' || field === 'unit_price') {
+            updatedItem.total_price = Number(updatedItem.quantity || 0) * Number(updatedItem.unit_price || 0);
           }
+          
+          // Auto-populate from inventory item
+          if (field === 'inventory_item_id' && value) {
+            console.log('Selected inventory item ID:', value);
+            const selectedItem = inventoryItems.find(inv => inv.id === value);
+            console.log('Found inventory item:', selectedItem);
+            
+            if (selectedItem) {
+              updatedItem.item_code = selectedItem.sku || '';
+              updatedItem.item_description = selectedItem.description || selectedItem.name;
+              updatedItem.category = selectedItem.category_id || '';
+              updatedItem.unit_of_measure = selectedItem.unit_of_measurement;
+              updatedItem.unit_price = Number(selectedItem.unit_price) || 0;
+              updatedItem.total_price = Number(updatedItem.quantity || 1) * Number(selectedItem.unit_price || 0);
+              
+              console.log('Updated item with inventory data:', updatedItem);
+            } else {
+              console.warn('Selected inventory item not found in inventory items list');
+              // Reset fields if item not found
+              updatedItem.item_code = '';
+              updatedItem.item_description = '';
+              updatedItem.unit_price = 0;
+              updatedItem.total_price = 0;
+            }
+          }
+          
+          // Only clear inventory item when category changes and it's different from the item's category
+          if (field === 'category' && value !== item.category) {
+            const currentInventoryItem = inventoryItems.find(inv => inv.id === item.inventory_item_id);
+            if (currentInventoryItem && currentInventoryItem.category_id !== value) {
+              updatedItem.inventory_item_id = '';
+              updatedItem.item_code = '';
+              updatedItem.item_description = '';
+              updatedItem.unit_price = 0;
+              updatedItem.total_price = 0;
+            }
+          }
+          
+          console.log('Final updated item:', updatedItem);
+          return updatedItem;
         }
-        
-        // Clear inventory item when category changes
-        if (field === 'category') {
-          updatedItem.inventory_item_id = '';
-          updatedItem.item_code = '';
-          updatedItem.item_description = '';
-          updatedItem.unit_price = 0;
-          updatedItem.total_price = 0;
-        }
-        
-        return updatedItem;
-      }
-      return item;
-    }));
+        return item;
+      });
+    });
   };
 
   // Get filtered inventory items based on selected category
   const getFilteredInventoryItems = (categoryId: string) => {
-    if (!categoryId) return inventoryItems;
-    return inventoryItems.filter(item => item.category_id === categoryId);
+    console.log('Filtering inventory items for category:', categoryId);
+    console.log('Available inventory items:', inventoryItems);
+    
+    if (!categoryId) {
+      console.log('No category selected, returning all items');
+      return inventoryItems;
+    }
+    
+    const filtered = inventoryItems.filter(item => item.category_id === categoryId);
+    console.log('Filtered items:', filtered);
+    return filtered;
   };
 
   const getTotalAmount = () => {
@@ -237,10 +267,10 @@ export const PurchaseOrderForm = ({
         payment_terms: formData.payment_terms,
         shipping_method: formData.shipping_method,
         delivery_address: formData.delivery_address,
-        authorized_by: formData.authorized_by || null,
-        notes: formData.notes,
+        notes: formData.notes || '',
         total_amount: getTotalAmount(),
-        status: 'pending'
+        status: 'pending',
+        order_date: new Date().toISOString().split('T')[0] // Add current date
       };
       
       console.log('Creating purchase order with payload:', poPayload);
@@ -252,21 +282,26 @@ export const PurchaseOrderForm = ({
 
       if (poError) {
         console.error('Purchase order creation error:', poError);
-        throw poError;
+        throw new Error(`Failed to create purchase order: ${poError.message}`);
       }
+      
+      if (!purchaseOrder) {
+        throw new Error('Purchase order was not created');
+      }
+      
       console.log('Purchase order created:', purchaseOrder);
 
       // Create purchase order items
       const itemsToInsert = orderItems.map(item => ({
         purchase_order_id: purchaseOrder.id,
-        inventory_item_id: item.inventory_item_id || null,
-        item_code: item.item_code,
-        item_description: item.item_description,
-        category: item.category,
-        quantity: item.quantity,
+        inventory_item_id: item.inventory_item_id,
+        quantity: Number(item.quantity),
+        unit_price: Number(item.unit_price),
         unit_of_measure: item.unit_of_measure,
-        unit_price: item.unit_price,
-        remarks: item.remarks
+        item_code: item.item_code || null,
+        item_description: item.item_description || null,
+        category: item.category || null,
+        remarks: item.remarks || null
       }));
 
       console.log('Creating purchase order items:', itemsToInsert);
@@ -276,8 +311,14 @@ export const PurchaseOrderForm = ({
 
       if (itemsError) {
         console.error('Purchase order items creation error:', itemsError);
-        throw itemsError;
+        // Rollback purchase order if items creation fails
+        await supabase
+          .from('purchase_orders')
+          .delete()
+          .eq('id', purchaseOrder.id);
+        throw new Error(`Failed to create purchase order items: ${itemsError.message}`);
       }
+      
       console.log('Purchase order items created successfully');
 
       toast({
@@ -296,7 +337,6 @@ export const PurchaseOrderForm = ({
         payment_terms: '',
         shipping_method: '',
         delivery_address: '',
-        authorized_by: '',
         notes: ''
       });
       setOrderItems([{
@@ -316,7 +356,7 @@ export const PurchaseOrderForm = ({
       console.error('Error creating purchase order:', error);
       toast({
         title: "Error",
-        description: "Failed to create purchase order. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create purchase order. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -343,8 +383,14 @@ export const PurchaseOrderForm = ({
                 value={formData.supplier_id}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, supplier_id: value }))}
               >
-                <SelectTrigger className={errors.supplier_id ? "border-red-500" : ""}>
-                  <SelectValue placeholder="Select supplier" />
+                <SelectTrigger className={`w-full ${errors.supplier_id ? "border-red-500" : ""}`}>
+                  {formData.supplier_id ? (
+                    <span className="font-medium">
+                      {suppliers.find(supplier => supplier.id === formData.supplier_id)?.name || "Select supplier"}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Select supplier</span>
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map((supplier) => (
@@ -395,8 +441,12 @@ export const PurchaseOrderForm = ({
                 value={formData.payment_terms}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, payment_terms: value }))}
               >
-                <SelectTrigger className={errors.payment_terms ? "border-red-500" : ""}>
-                  <SelectValue placeholder="Select payment terms" />
+                <SelectTrigger className={`w-full ${errors.payment_terms ? "border-red-500" : ""}`}>
+                  {formData.payment_terms ? (
+                    <span className="font-medium">{formData.payment_terms}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Select payment terms</span>
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Net 30">Net 30</SelectItem>
@@ -420,8 +470,12 @@ export const PurchaseOrderForm = ({
                 value={formData.shipping_method}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, shipping_method: value }))}
               >
-                <SelectTrigger className={errors.shipping_method ? "border-red-500" : ""}>
-                  <SelectValue placeholder="Select shipping method" />
+                <SelectTrigger className={`w-full ${errors.shipping_method ? "border-red-500" : ""}`}>
+                  {formData.shipping_method ? (
+                    <span className="font-medium">{formData.shipping_method}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Select shipping method</span>
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Standard">Standard</SelectItem>
@@ -496,26 +550,68 @@ export const PurchaseOrderForm = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label>Inventory Item *</Label>
+                      {/* Removed duplicated select for inventory item */}
                       <Select
+                        key={`inventory-select-${item.id}-${item.category}`}
+                        defaultValue={item.inventory_item_id}
                         value={item.inventory_item_id}
-                        onValueChange={(value) => updateOrderItem(item.id, 'inventory_item_id', value)}
+                        onValueChange={(value) => {
+                          console.log("Selected inventory item:", value);
+                          updateOrderItem(item.id, 'inventory_item_id', value);
+                        }}
                       >
-                        <SelectTrigger className={errors[`item_${index}_inventory`] ? "border-red-500" : ""}>
-                          <SelectValue placeholder={
-                            getFilteredInventoryItems(item.category).length === 0 
-                              ? "No items available" 
-                              : "Select item"
-                          } />
+                        <SelectTrigger className={`w-full ${errors[`item_${index}_inventory`] ? "border-red-500" : ""}`}>
+                          <SelectValue placeholder="Select item">
+                            {item.inventory_item_id ? (
+                              <div className="flex items-center">
+                                <span className="font-medium">
+                                  {inventoryItems.find(invItem => invItem.id === item.inventory_item_id)?.name || "Select item"}
+                                </span>
+                                {item.inventory_item_id && (
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    {inventoryItems.find(invItem => invItem.id === item.inventory_item_id)?.sku || ""}
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">Select item</span>
+                            )}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          {getFilteredInventoryItems(item.category).length === 0 ? (
+                          {inventoryItems.length === 0 ? (
                             <div className="px-2 py-1.5 text-sm text-gray-500">
-                              {!item.category ? "Please select a category first" : "No items available in this category"}
+                              No inventory items available
+                            </div>
+                          ) : !item.category ? (
+                            // Show all items when no category is selected
+                            inventoryItems.map((invItem) => (
+                              <SelectItem 
+                                key={invItem.id} 
+                                value={invItem.id}
+                                textValue={invItem.name}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{invItem.name}</span>
+                                  {invItem.sku && <span className="text-xs text-gray-500 ml-2">({invItem.sku})</span>}
+                                </div>
+                              </SelectItem>
+                            ))
+                          ) : getFilteredInventoryItems(item.category).length === 0 ? (
+                            <div className="px-2 py-1.5 text-sm text-gray-500">
+                              No items available in this category
                             </div>
                           ) : (
                             getFilteredInventoryItems(item.category).map((invItem) => (
-                              <SelectItem key={invItem.id} value={invItem.id}>
-                                {invItem.name} {invItem.sku ? `(${invItem.sku})` : ''} - ${invItem.unit_price}
+                              <SelectItem 
+                                key={invItem.id} 
+                                value={invItem.id}
+                                textValue={invItem.name}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{invItem.name}</span>
+                                  {invItem.sku && <span className="text-xs text-gray-500 ml-2">({invItem.sku})</span>}
+                                </div>
                               </SelectItem>
                             ))
                           )}
@@ -527,10 +623,9 @@ export const PurchaseOrderForm = ({
                           {errors[`item_${index}_inventory`]}
                         </div>
                       )}
-                      {/* Show available items count */}
                       {item.category && (
                         <div className="text-xs text-gray-500">
-                          {getFilteredInventoryItems(item.category).length} items available in this category
+                          {getFilteredInventoryItems(item.category).length} items available
                         </div>
                       )}
                     </div>
@@ -547,11 +642,17 @@ export const PurchaseOrderForm = ({
                     <div className="space-y-2">
                       <Label>Category</Label>
                       <Select
-                        value={item.category}
+                        value={item.category || ""}
                         onValueChange={(value) => updateOrderItem(item.id, 'category', value)}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category first" />
+                        <SelectTrigger className="w-full">
+                          {item.category ? (
+                            <span className="font-medium">
+                              {categories.find(cat => cat.id === item.category)?.name || "Select category"}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Select category</span>
+                          )}
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map((category) => (
@@ -583,11 +684,13 @@ export const PurchaseOrderForm = ({
                     <div className="space-y-2">
                       <Label>Unit of Measure</Label>
                       <Select
-                        value={item.unit_of_measure}
+                        value={item.unit_of_measure || "units"}
                         onValueChange={(value) => updateOrderItem(item.id, 'unit_of_measure', value)}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
+                        <SelectTrigger className="w-full">
+                          <span className="font-medium">
+                            {item.unit_of_measure ? item.unit_of_measure.charAt(0).toUpperCase() + item.unit_of_measure.slice(1) : "Units"}
+                          </span>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="units">Units</SelectItem>

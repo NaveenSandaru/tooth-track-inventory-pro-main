@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PurchaseOrderForm } from "@/components/purchase-orders/PurchaseOrderForm";
+import { PurchaseOrderViewDialog } from "@/components/purchase-orders/PurchaseOrderViewDialog";
 import { 
   Plus, 
   Search, 
@@ -30,6 +31,8 @@ const PurchaseOrders = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState<string | null>(null);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -51,18 +54,35 @@ const PurchaseOrders = () => {
           purchase_order_items(*)
         `).order('created_at', { ascending: false }),
         supabase.from('suppliers').select('*').order('name'),
-        supabase.from('inventory_items').select('*').order('name'),
+        supabase.from('inventory_items').select(`
+          *,
+          suppliers (
+            id,
+            name
+          )
+        `).order('name'),
         supabase.from('inventory_categories').select('*').order('name')
       ]);
 
+      // Log responses for debugging
       console.log('Purchase orders response:', poResponse);
       console.log('Suppliers response:', suppliersResponse);
       console.log('Inventory items response:', itemsResponse);
       console.log('Categories response:', categoriesResponse);
 
+      // Check for errors in responses
+      if (poResponse.error) throw new Error(`Purchase orders error: ${poResponse.error.message}`);
+      if (suppliersResponse.error) throw new Error(`Suppliers error: ${suppliersResponse.error.message}`);
+      if (itemsResponse.error) throw new Error(`Inventory items error: ${itemsResponse.error.message}`);
+      if (categoriesResponse.error) throw new Error(`Categories error: ${categoriesResponse.error.message}`);
+
+      // Set state with response data
       if (poResponse.data) setPurchaseOrders(poResponse.data);
       if (suppliersResponse.data) setSuppliers(suppliersResponse.data);
-      if (itemsResponse.data) setInventoryItems(itemsResponse.data);
+      if (itemsResponse.data) {
+        console.log('Setting inventory items:', itemsResponse.data);
+        setInventoryItems(itemsResponse.data);
+      }
       if (categoriesResponse.data) setCategories(categoriesResponse.data);
 
       console.log('Data loaded successfully:');
@@ -71,10 +91,10 @@ const PurchaseOrders = () => {
       console.log('- Inventory items:', itemsResponse.data?.length || 0);
       console.log('- Categories:', categoriesResponse.data?.length || 0);
     } catch (error) {
-      console.error('Error fetching purchase orders:', error);
+      console.error('Error fetching data:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch purchase orders",
+        description: error instanceof Error ? error.message : "Failed to fetch data",
         variant: "destructive"
       });
     } finally {
@@ -186,169 +206,110 @@ const PurchaseOrders = () => {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid gap-4">
         {filteredOrders.map((order: any) => (
-          <Card key={order.id} className="card-hover">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <CardTitle className="text-lg font-semibold">
-                    {order.po_number}
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    {order.suppliers?.name || 'No supplier'} • {new Date(order.order_date).toLocaleDateString()}
-                  </CardDescription>
-                </div>
-                {getStatusBadge(order.status)}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Order Date:</span>
-                  <span className="font-medium">{new Date(order.order_date).toLocaleDateString()}</span>
-                </div>
-                {order.requested_by && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      <User className="h-3 w-3" />
-                      Requested By:
-                    </span>
-                    <span className="font-medium">{order.requested_by}</span>
+          <Card key={order.id} className="overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-5 w-5 text-dental-primary" />
+                    <h3 className="text-lg font-semibold">{order.po_number}</h3>
+                    {getStatusBadge(order.status)}
                   </div>
-                )}
-                {order.expected_delivery_date && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Expected:
-                    </span>
-                    <span className="font-medium">{new Date(order.expected_delivery_date).toLocaleDateString()}</span>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center text-gray-600">
+                      <User className="h-4 w-4 mr-2" />
+                      <span>Requested by: {order.requested_by}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      <span>Order Date: {new Date(order.order_date).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <Package className="h-4 w-4 mr-2" />
+                      <span>Supplier: {order.suppliers?.name}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      <span>Total Amount: ${order.total_amount?.toFixed(2)}</span>
+                    </div>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-gray-600 flex items-center gap-1">
-                    <DollarSign className="h-3 w-3" />
-                    Total Amount:
-                  </span>
-                  <span className="font-medium">${order.total_amount || '0.00'}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 flex items-center gap-1">
-                    <Package className="h-3 w-3" />
-                    Items:
-                  </span>
-                  <span className="font-medium">{order.purchase_order_items?.length || 0}</span>
-                </div>
-                {order.payment_terms && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Payment Terms:</span>
-                    <span className="font-medium text-xs">{order.payment_terms}</span>
-                  </div>
-                )}
-                {order.delivery_address && (
-                  <div className="flex items-start justify-between">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      Delivery:
-                    </span>
-                    <span className="font-medium text-xs text-right max-w-[120px]">{order.delivery_address}</span>
-                  </div>
-                )}
-              </div>
 
-              <div className="flex items-center space-x-2 pt-2">
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Eye className="h-4 w-4 mr-1" />
-                  View
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  <FileText className="h-4 w-4 mr-1" />
-                  Print
-                </Button>
-              </div>
-
-              {/* Status Action Buttons */}
-              <div className="flex items-center space-x-2">
-                {order.status === 'pending' && (
-                  <>
-                    <Button 
-                      size="sm" 
+                <div className="flex items-center space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedPurchaseOrder(order.id);
+                      setIsViewOpen(true);
+                    }}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View
+                  </Button>
+                  
+                  {order.status === 'pending' && (
+                    <Button
                       variant="outline"
+                      size="sm"
                       onClick={() => updatePOStatus(order.id, 'approved')}
-                      className="flex-1 text-blue-600 border-blue-200"
                     >
+                      <CheckCircle className="h-4 w-4 mr-2" />
                       Approve
                     </Button>
-                    <Button 
-                      size="sm" 
+                  )}
+                  
+                  {order.status === 'approved' && (
+                    <Button
                       variant="outline"
-                      onClick={() => updatePOStatus(order.id, 'cancelled')}
-                      className="flex-1 text-red-600 border-red-200"
+                      size="sm"
+                      onClick={() => updatePOStatus(order.id, 'ordered')}
                     >
-                      Cancel
+                      <Package className="h-4 w-4 mr-2" />
+                      Mark as Ordered
                     </Button>
-                  </>
-                )}
-                {order.status === 'approved' && (
-                  <Button 
-                    size="sm" 
-                    onClick={() => updatePOStatus(order.id, 'ordered')}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700"
-                  >
-                    Mark as Ordered
-                  </Button>
-                )}
-                {order.status === 'ordered' && (
-                  <Button 
-                    size="sm" 
-                    onClick={() => updatePOStatus(order.id, 'received')}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                  >
-                    Mark as Received
-                  </Button>
-                )}
+                  )}
+                  
+                  {order.status === 'ordered' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updatePOStatus(order.id, 'received')}
+                    >
+                      <Truck className="h-4 w-4 mr-2" />
+                      Mark as Received
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {filteredOrders.length === 0 && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No purchase orders found</h3>
-            <p className="text-gray-600 mb-4">
-              {searchTerm || statusFilter !== "all" 
-                ? "Try adjusting your filters or search terms"
-                : "Get started by creating your first purchase order"
-              }
-            </p>
-            {!searchTerm && statusFilter === "all" && (
-              <Button 
-                className="bg-dental-primary hover:bg-dental-secondary"
-                onClick={() => setIsAddOpen(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Purchase Order
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       <PurchaseOrderForm
         suppliers={suppliers}
         inventoryItems={inventoryItems}
         categories={categories}
-        onSuccess={fetchData}
+        onSuccess={() => {
+          fetchData();
+          setIsAddOpen(false);
+        }}
         isOpen={isAddOpen}
         onOpenChange={setIsAddOpen}
+      />
+
+      <PurchaseOrderViewDialog
+        isOpen={isViewOpen}
+        onOpenChange={setIsViewOpen}
+        purchaseOrderId={selectedPurchaseOrder}
+        onSuccess={() => {
+          fetchData();
+          setIsViewOpen(false);
+        }}
       />
     </div>
   );
