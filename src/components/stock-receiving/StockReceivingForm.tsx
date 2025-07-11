@@ -647,7 +647,7 @@ export const StockReceivingForm = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <Label htmlFor="purchase_order_id">Linked PO Number</Label>
+                <Label htmlFor="purchase_order_id">Linked PO Number *</Label>
                 {formData.purchase_order_id && !readOnly && (
                   <Button 
                     variant="outline" 
