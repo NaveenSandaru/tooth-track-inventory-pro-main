@@ -228,9 +228,9 @@ const Settings = () => {
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+       
           <TabsTrigger value="categories">Categories</TabsTrigger>
         </TabsList>
 
@@ -278,7 +278,7 @@ const Settings = () => {
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button className="bg-dental-primary hover:bg-dental-secondary" onClick={handleSaveSystemSettings}>
+                <Button className="bg-emerald-500 hover:bg-emerald-600" onClick={handleSaveSystemSettings}>
                   Save Changes
                 </Button>
               </div>
@@ -286,7 +286,7 @@ const Settings = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-6">
+        {/*<TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Notification Settings</CardTitle>
@@ -354,7 +354,7 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent>*/}
 
         <TabsContent value="categories" className="space-y-6">
           <Card>
@@ -366,7 +366,7 @@ const Settings = () => {
                 </div>
                 <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-dental-primary hover:bg-dental-secondary">
+                    <Button className="bg-emerald-500 hover:bg-emerald-600">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Category
                     </Button>
@@ -380,7 +380,7 @@ const Settings = () => {
                     </DialogHeader>
                                          <div className="grid gap-4 py-4">
                        <div className="space-y-2">
-                         <Label htmlFor="categoryName">Category Name *</Label>
+                         <Label htmlFor="categoryName" >Category Name *</Label>
                          <Input
                            id="categoryName"
                            value={newCategory.name}
@@ -420,9 +420,7 @@ const Settings = () => {
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex space-x-1">
-                            <Button variant="ghost" size="sm">
-                              <SettingsIcon className="h-4 w-4" />
-                            </Button>
+                            
                             <Button 
                               variant="ghost" 
                               size="sm" 
