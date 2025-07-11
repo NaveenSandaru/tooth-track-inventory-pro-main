@@ -1,8 +1,6 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -34,7 +32,6 @@ type InventoryItem = {
   minimum_stock?: number;
   inventory_categories: InventoryCategory | null; // no longer an array
 };
-
 
 type UsageReport = {
   categoryId: string;
@@ -95,6 +92,10 @@ const Reports = () => {
         item.current_stock,
         item.minimum_stock,
       ]),
+      headStyles: {
+        fillColor: [16, 185, 129], // emerald-500
+        textColor: 255,            // white text
+      },
     });
 
     doc.save("stock_report.pdf");
@@ -115,6 +116,10 @@ const Reports = () => {
         ["Minimum Stock", item.minimum_stock],
         ["Status", item.type.charAt(0).toUpperCase() + item.type.slice(1)],
       ],
+      headStyles: {
+        fillColor: [16, 185, 129], // emerald-500
+        textColor: 255,            // white text
+      },
     });
 
     doc.save(`${item.name}_report.pdf`);
