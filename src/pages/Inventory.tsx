@@ -32,6 +32,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { BarcodeScanner } from "@/components/inventory/BarcodeScanner";
 import { StockUpdateDialog } from "@/components/inventory/StockUpdateDialog";
 import { StockOutDialog } from "@/components/inventory/StockOutDialog";
+import { logActivity } from "@/lib/activity-logger";
 
 // Define custom type for inventory items with joined supplier data
 type InventoryItemWithRelations = Database["public"]["Tables"]["inventory_items"]["Row"] & {
@@ -74,7 +75,92 @@ const Inventory = () => {
         supabase.from('suppliers').select('*').order('name')
       ]);
 
-      if (itemsResponse.data) setInventoryItems(itemsResponse.data as InventoryItemWithRelations[]);
+      if (itemsResponse.data) {
+        // Check for items that are now below minimum stock
+        const items = itemsResponse.data as InventoryItemWithRelations[];
+        setInventoryItems(items);
+        
+        // Get the last known stock alerts to avoid duplicates
+        const { data: recentAlerts } = await supabase
+          .from('activity_log')
+          .select('item_id, created_at, action')
+          .in('action', ['Stock Alert', 'Item Expired'])
+          .order('created_at', { ascending: false });
+        
+        // Create maps of the most recent alert times for each item by alert type
+        const lastAlertTimeMap = new Map();
+        const lastExpiredTimeMap = new Map();
+        
+        if (recentAlerts) {
+          recentAlerts.forEach(alert => {
+            if (alert.item_id) {
+              if (alert.action === 'Stock Alert' && 
+                  (!lastAlertTimeMap.has(alert.item_id) || 
+                   new Date(alert.created_at) > new Date(lastAlertTimeMap.get(alert.item_id)))) {
+                lastAlertTimeMap.set(alert.item_id, alert.created_at);
+              }
+              
+              if (alert.action === 'Item Expired' && 
+                  (!lastExpiredTimeMap.has(alert.item_id) || 
+                   new Date(alert.created_at) > new Date(lastExpiredTimeMap.get(alert.item_id)))) {
+                lastExpiredTimeMap.set(alert.item_id, alert.created_at);
+              }
+            }
+          });
+        }
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Set to beginning of day for comparison
+        
+        // Check for items below minimum stock and log alerts if needed
+        for (const item of items) {
+          // Check for low stock
+          if (item.current_stock <= item.minimum_stock) {
+            // Only log a new alert if:
+            // 1. We've never logged an alert for this item, or
+            // 2. The last alert was more than 24 hours ago
+            const lastAlertTime = lastAlertTimeMap.get(item.id);
+            const shouldLogAlert = !lastAlertTime || 
+              (new Date().getTime() - new Date(lastAlertTime).getTime() > 24 * 60 * 60 * 1000);
+            
+            if (shouldLogAlert) {
+              await logActivity(
+                'Stock Alert',
+                item.name,
+                'System',
+                item.id,
+                `${item.current_stock}/${item.minimum_stock} ${item.unit_of_measurement}`
+              );
+            }
+          }
+          
+          // Check for expired items
+          if (item.expiry_date) {
+            const expiryDate = new Date(item.expiry_date);
+            expiryDate.setHours(0, 0, 0, 0); // Set to beginning of day for comparison
+            
+            if (expiryDate <= today) {
+              // Only log a new expiry alert if:
+              // 1. We've never logged an expiry for this item, or
+              // 2. The last expiry alert was more than 24 hours ago
+              const lastExpiredTime = lastExpiredTimeMap.get(item.id);
+              const shouldLogExpiry = !lastExpiredTime || 
+                (new Date().getTime() - new Date(lastExpiredTime).getTime() > 24 * 60 * 60 * 1000);
+              
+              if (shouldLogExpiry) {
+                await logActivity(
+                  'Item Expired',
+                  item.name,
+                  'System',
+                  item.id,
+                  `Expired on ${expiryDate.toLocaleDateString()}`
+                );
+              }
+            }
+          }
+        }
+      }
+      
       if (categoriesResponse.data) setCategories(categoriesResponse.data);
       if (suppliersResponse.data) setSuppliers(suppliersResponse.data);
     } catch (error) {
@@ -137,7 +223,7 @@ const Inventory = () => {
 
   const addItem = async (formData: any) => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('inventory_items')
         .insert([{
           name: formData.name,
@@ -152,9 +238,21 @@ const Inventory = () => {
           track_batches: formData.trackBatches,
           alert_expiry_days: parseInt(formData.alertExpiryDays) || 30,
           location: formData.location
-        }]);
+        }])
+        .select();
 
       if (error) throw error;
+
+      // Log the activity
+      if (data && data[0]) {
+        await logActivity(
+          'New Item Added',
+          formData.name,
+          'Staff User', // In a real app, you'd get this from the auth context
+          data[0].id,
+          `Initial stock: ${formData.currentStock} ${formData.unit || 'units'}`
+        );
+      }
 
       toast({
         title: "Success",
@@ -239,8 +337,22 @@ const Inventory = () => {
   const confirmDelete = async () => {
     if (!selectedItem) return;
     try {
+      // Store item details before deletion for activity log
+      const itemName = selectedItem.name;
+      const itemId = selectedItem.id;
+
       const { error } = await supabase.from('inventory_items').delete().eq('id', selectedItem.id);
       if (error) throw error;
+
+      // Log the activity
+      await logActivity(
+        'Item Deleted',
+        itemName,
+        'Staff User', // In a real app, you'd get this from the auth context
+        null, // Item ID is now null since it's deleted
+        null  // No quantity for deletion
+      );
+
       toast({ title: "Deleted", description: "Item deleted successfully" });
       setIsDeleteConfirmOpen(false);
       setSelectedItem(null);
@@ -741,6 +853,16 @@ const Inventory = () => {
                     })
                     .eq('id', selectedItem.id);
                   if (error) throw error;
+
+                  // Log the activity
+                  await logActivity(
+                    'Item Updated',
+                    formData.get('name') as string,
+                    'Staff User', // In a real app, you'd get this from the auth context
+                    selectedItem.id,
+                    null
+                  );
+
                   toast({ title: "Success", description: "Item updated successfully" });
                   setIsEditOpen(false);
                   setSelectedItem(null);

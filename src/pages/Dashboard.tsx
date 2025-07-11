@@ -25,13 +25,9 @@ type InventoryItemWithRelations = Database["public"]["Tables"]["inventory_items"
   supplier?: { name: string } | null;
 };
 
-type RecentActivity = {
-  id: string;
-  action: string;
-  item: string;
-  quantity: string;
-  time: string;
-  user: string;
+// Define type for activity log entries
+type ActivityLog = Database["public"]["Tables"]["activity_log"]["Row"] & {
+  time_ago?: string;
 };
 
 const Dashboard = () => {
@@ -40,7 +36,7 @@ const Dashboard = () => {
   const [inventoryItems, setInventoryItems] = useState<InventoryItemWithRelations[]>([]);
   const [lowStockItems, setLowStockItems] = useState<InventoryItemWithRelations[]>([]);
   const [expiringItems, setExpiringItems] = useState<InventoryItemWithRelations[]>([]);
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
   const [systemConfig, setSystemConfig] = useState<Database["public"]["Tables"]["system_configuration"]["Row"] | null>(null);
   const [stats, setStats] = useState([
     {
@@ -80,6 +76,27 @@ const Dashboard = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Helper function to format time ago
+  const getTimeAgo = (timestamp: string) => {
+    const now = new Date();
+    const past = new Date(timestamp);
+    const diffMs = now.getTime() - past.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) {
+      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+    } else if (diffHours > 0) {
+      return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+    } else if (diffMins > 0) {
+      return diffMins === 1 ? '1 minute ago' : `${diffMins} minutes ago`;
+    } else {
+      return 'just now';
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -157,30 +174,22 @@ const Dashboard = () => {
         setStats(updatedStats);
       }
 
-      // For recent activity, we'll create a mock implementation since there's no direct table for this
-      // In a real implementation, this would come from a transactions or activity log table
-      // For now, we'll generate some based on the inventory data
-      if (itemsData && itemsData.length > 0) {
-        const mockActivity: RecentActivity[] = [];
-        
-        // Add some mock activities based on real inventory items
-        const recentItems = itemsData.slice(0, 4);
-        const actions = ["Stock Added", "Item Used", "New Item Added", "Stock Alert"];
-        const times = ["2 hours ago", "4 hours ago", "6 hours ago", "8 hours ago"];
-        const users = ["Dr. Smith", "Dr. Johnson", "Admin", "System"];
-        
-        recentItems.forEach((item, index) => {
-          mockActivity.push({
-            id: index.toString(),
-            action: actions[index],
-            item: item.name,
-            quantity: index === 3 ? "Below minimum" : `${Math.floor(Math.random() * 10) + 1} ${item.unit_of_measurement}`,
-            time: times[index],
-            user: users[index]
-          });
-        });
-        
-        setRecentActivity(mockActivity);
+      // Fetch recent activity from activity_log table
+      const { data: activityData, error } = await supabase
+        .from('activity_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) {
+        console.error("Error fetching activity data:", error);
+      } else if (activityData) {
+        // Add time_ago property to each activity log entry
+        const formattedActivity = activityData.map(activity => ({
+          ...activity,
+          time_ago: getTimeAgo(activity.created_at)
+        }));
+        setRecentActivity(formattedActivity);
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -209,21 +218,6 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold text-dental-dark">Dashboard</h1>
           <p className="text-gray-600 mt-1">Welcome back! Here's your inventory overview.</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search inventory..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-80"
-            />
-          </div>
-          <Button className="bg-dental-primary hover:bg-dental-secondary">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Item
-          </Button>
         </div>
       </div>
 
@@ -353,26 +347,30 @@ const Dashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                <div className="w-2 h-2 bg-dental-primary rounded-full"></div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium text-dental-dark">{activity.action}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {activity.item}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-                    <span>{activity.quantity}</span>
-                    <span>•</span>
-                    <span>{activity.time}</span>
-                    <span>•</span>
-                    <span>by {activity.user}</span>
+            {recentActivity.length === 0 ? (
+              <div className="text-center py-4 text-gray-500">No recent activity</div>
+            ) : (
+              recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                  <div className="w-2 h-2 bg-dental-primary rounded-full"></div>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-dental-dark">{activity.action}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {activity.item_name}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
+                      <span>{activity.quantity}</span>
+                      <span>•</span>
+                      <span>{activity.time_ago}</span>
+                      <span>•</span>
+                      <span>by {activity.user_name}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
