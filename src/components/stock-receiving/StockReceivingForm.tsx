@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Upload, AlertTriangle, FileText, X } from "lucide-react";
+import { Upload, FileText, AlertTriangle, XCircle, AlertCircle, CheckCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -646,11 +646,28 @@ export const StockReceivingForm = ({
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="purchase_order_id">Linked PO Number</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="purchase_order_id">Linked PO Number *</Label>
+                {formData.purchase_order_id && !readOnly && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-xs h-7 px-2 text-muted-foreground hover:bg-red-50 hover:text-red-600 border-dashed"
+                    onClick={() => {
+                      setFormData({...formData, purchase_order_id: ''});
+                      setReceivingItems([]);
+                      setSelectedPO(null);
+                    }}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear PO
+                  </Button>
+                )}
+              </div>
               <Select
                 value={formData.purchase_order_id}
                 onValueChange={(value) => setFormData({ ...formData, purchase_order_id: value })}
-                disabled={receivingItems.length > 0 || readOnly}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select PO (optional)" />
@@ -670,7 +687,7 @@ export const StockReceivingForm = ({
               <Select
                 value={formData.supplier_id}
                 onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
-                disabled={formData.purchase_order_id !== '' || readOnly}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select supplier" />

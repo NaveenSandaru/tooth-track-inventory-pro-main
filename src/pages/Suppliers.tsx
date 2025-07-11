@@ -23,6 +23,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 // Add SupplierForm component for both add and edit
 function SupplierForm({ initial, onSubmit, onCancel }: {
@@ -110,7 +111,7 @@ function SupplierForm({ initial, onSubmit, onCancel }: {
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+        <Button type="submit" className="bg-primary hover:bg-secondary">
           Save
         </Button>
       </div>
@@ -126,9 +127,18 @@ const Suppliers = () => {
   const { toast } = useToast();
   const [selectedSupplier, setSelectedSupplier] = useState<Database["public"]["Tables"]["suppliers"]["Row"] | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState<Database["public"]["Tables"]["suppliers"]["Row"] | null>(null);
+  const [stats, setStats] = useState({
+    activeCount: 0,
+    pendingReviews: 0,
+    totalOrders: 0,
+    avgRating: 0
+  });
 
   useEffect(() => {
     fetchSuppliers();
+    fetchStats();
   }, []);
 
   const fetchSuppliers = async () => {
@@ -140,6 +150,51 @@ const Suppliers = () => {
       setSuppliers(data || []);
     }
     setLoading(false);
+  };
+
+  const fetchStats = async () => {
+    try {
+      // Get active suppliers count
+      const { data: activeSuppliers } = await supabase
+        .from('suppliers')
+        .select('id')
+        .eq('status', 'active');
+
+      // Get pending reviews count
+      const { data: pendingReviews } = await supabase
+        .from('supplier_reviews')
+        .select('id')
+        .eq('status', 'pending');
+
+      // Get total orders count
+      const { data: orders } = await supabase
+        .from('purchase_orders')
+        .select('id');
+
+      // Get average rating from approved reviews
+      const { data: ratings } = await supabase
+        .from('supplier_reviews')
+        .select('rating')
+        .eq('status', 'approved');
+
+      const avgRating = ratings?.length 
+        ? Number((ratings.reduce((acc, curr) => acc + curr.rating, 0) / ratings.length).toFixed(1))
+        : 0;
+
+      setStats({
+        activeCount: activeSuppliers?.length || 0,
+        pendingReviews: pendingReviews?.length || 0,
+        totalOrders: orders?.length || 0,
+        avgRating
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch supplier statistics",
+        variant: "destructive"
+      });
+    }
   };
 
   const addSupplier = async (formData: any) => {
@@ -176,6 +231,36 @@ const Suppliers = () => {
       fetchSuppliers();
     } catch (error) {
       toast({ title: "Error", description: "Failed to delete supplier", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteClick = (supplier: Database["public"]["Tables"]["suppliers"]["Row"]) => {
+    setSupplierToDelete(supplier);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!supplierToDelete) return;
+    
+    try {
+      const { error } = await supabase.from('suppliers').delete().eq('id', supplierToDelete.id);
+      if (error) throw error;
+      
+      toast({ 
+        title: "Supplier Deleted", 
+        description: `${supplierToDelete.name} has been removed successfully.`,
+        variant: "default"
+      });
+      
+      setIsDeleteDialogOpen(false);
+      setSupplierToDelete(null);
+      fetchSuppliers();
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to delete supplier. Please try again.", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -216,7 +301,7 @@ const Suppliers = () => {
         </div>
         <Dialog open={isAddSupplierOpen} onOpenChange={setIsAddSupplierOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-dental-primary hover:bg-dental-secondary">
+            <Button className="bg-primary hover:bg-secondary">
               <Plus className="h-4 w-4 mr-2" />
               Add New Supplier
             </Button>
@@ -261,7 +346,7 @@ const Suppliers = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Active Suppliers</p>
-                <p className="text-xl font-bold text-dental-dark">3</p>
+                <p className="text-xl font-bold text-dental-dark">{stats.activeCount}</p>
               </div>
             </div>
           </CardContent>
@@ -274,7 +359,7 @@ const Suppliers = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Pending Reviews</p>
-                <p className="text-xl font-bold text-dental-dark">1</p>
+                <p className="text-xl font-bold text-dental-dark">{stats.pendingReviews}</p>
               </div>
             </div>
           </CardContent>
@@ -287,7 +372,7 @@ const Suppliers = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Total Orders</p>
-                <p className="text-xl font-bold text-dental-dark">128</p>
+                <p className="text-xl font-bold text-dental-dark">{stats.totalOrders}</p>
               </div>
             </div>
           </CardContent>
@@ -300,7 +385,7 @@ const Suppliers = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Avg. Rating</p>
-                <p className="text-xl font-bold text-dental-dark">4.5</p>
+                <p className="text-xl font-bold text-dental-dark">{stats.avgRating}</p>
               </div>
             </div>
           </CardContent>
@@ -368,7 +453,7 @@ const Suppliers = () => {
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteClick(supplier)}>
                       <Trash className="h-4 w-4" />
                     </Button>
                   </div>
@@ -418,7 +503,7 @@ const Suppliers = () => {
                             <Button variant="ghost" size="sm" onClick={() => { setSelectedSupplier(supplier); setIsEditOpen(true); }}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="text-red-600">
+                            <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteClick(supplier)}>
                               <Trash className="h-4 w-4" />
                             </Button>
                           </div>
@@ -446,7 +531,7 @@ const Suppliers = () => {
             </p>
             {!searchTerm && (
               <Button 
-                className="bg-dental-primary hover:bg-dental-secondary"
+                className="bg-primary hover:bg-secondary"
                 onClick={() => setIsAddSupplierOpen(true)}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -475,6 +560,32 @@ const Suppliers = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Add AlertDialog for delete confirmation */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {supplierToDelete?.name}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false);
+              setSupplierToDelete(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
