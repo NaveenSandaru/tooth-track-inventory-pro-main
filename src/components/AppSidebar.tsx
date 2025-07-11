@@ -51,8 +51,9 @@ export function AppSidebar() {
   return (
     <Sidebar className={collapsed ? "w-14" : "w-64"} collapsible="icon">
       <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-center">
-          <img src="/logo.png" alt="DentalTrack Pro Logo" className="h-36 w-36 object-contain" />
+        <div className="flex flex-col items-center justify-center p-1">
+          <span className="mx-auto"><img src="/logo.png" alt="DentalTrack Pro Logo" className="h-16 w-16 object-contain" /></span>
+          <p className="text-sm text-gray-600 mt-1 p-2">Inventory Dashboard</p>
         </div>
         
       </div>
