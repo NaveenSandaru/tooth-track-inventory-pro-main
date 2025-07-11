@@ -129,11 +129,11 @@ const Reports = () => {
   const getReportBadge = (type: string) => {
     switch (type) {
       case "critical":
-        return <Badge className="bg-red-100 text-red-800">Critical</Badge>;
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 cursor-default">Critical</Badge>;
       case "warning":
-        return <Badge className="bg-yellow-100 text-yellow-800">Warning</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 cursor-default">Warning</Badge>;
       case "info":
-        return <Badge className="bg-blue-100 text-blue-800">Info</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 cursor-default">Info</Badge>;
       default:
         return <Badge variant="secondary">{type}</Badge>;
     }
@@ -152,11 +152,11 @@ const Reports = () => {
       }
 
       const formattedReports = data.map(item => {
-        let type = "info"; // Default if stock is fine
+        let type = "info";
 
         if (item.current_stock <= 0) {
           type = "critical";
-        } else if (item.current_stock < item.minimum_stock) {
+        } else if (item.current_stock <= item.minimum_stock) {
           type = "warning";
         }
 
@@ -340,7 +340,7 @@ const Reports = () => {
     try {
       const { data: inventoryItems, error: inventoryError } = await supabase
         .from("inventory_items")
-        .select("current_stock, unit_price, expiry_date");
+        .select("current_stock, unit_price, expiry_date, minimum_stock");
 
       if (inventoryError) throw inventoryError;
 
@@ -357,7 +357,7 @@ const Reports = () => {
         const price = parseFloat(item.unit_price) || 0;
         totalValue += stock * price;
 
-        if (item.minimum_stock && stock < item.minimum_stock) lowStock++;
+        if (item.minimum_stock && stock <= item.minimum_stock) lowStock++;
 
         if (item.expiry_date && new Date(item.expiry_date) <= expiryThreshold) expiring++;
       });
@@ -393,7 +393,7 @@ const Reports = () => {
     fetchUsageReports();
     fetchPurchaseReports();
     fetchQuickStats();
-  }, [])
+  }, []);
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -471,16 +471,16 @@ const Reports = () => {
       {/* Reports Tabs */}
       <Tabs defaultValue="stock" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="stock">Stock Reports</TabsTrigger>
-          <TabsTrigger value="usage">Usage Analytics</TabsTrigger>
-          <TabsTrigger value="purchasing">Purchase Reports</TabsTrigger>
+          <TabsTrigger value="stock" className="hover:bg-gray-200 hover:text-gray-900">Stock Reports</TabsTrigger>
+          <TabsTrigger value="usage" className="hover:bg-gray-200 hover:text-gray-900">Usage Analytics</TabsTrigger>
+          <TabsTrigger value="purchasing" className="hover:bg-gray-200 hover:text-gray-900">Purchase Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stock" className="space-y-6">
           <div className="flex justify-end">
             <button
               onClick={downloadStockReportPDF}
-              className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm"
+              className="flex items-center space-x-1 bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 rounded text-sm"
             >
               <Download size={16} />
               <span>Download PDF</span>
@@ -489,7 +489,7 @@ const Reports = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {stockReports.map((report) => (
-              <Card key={report.id} className="card-hover">
+              <Card key={report.id} >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -499,11 +499,9 @@ const Reports = () => {
 
                     <div className="flex items-center space-x-2">
                       {getReportBadge(report.type)}
-
-                      {/* Single item download */}
                       <button
                         onClick={() => downloadSingleStockReportPDF(report)}
-                        className="hover:text-blue-600"
+                        className="hover:text-emerald-600 hover:-translate-y-0.5 transition-transform duration-200"
                         title="Download Item Report"
                       >
                         <Download size={16} />
@@ -579,7 +577,7 @@ const Reports = () => {
                   </thead>
                   <tbody className="divide-y">
                     {purchaseReports.map((purchase, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
+                      <tr key={index} className="cursor-default">
                         <td className="p-4 font-medium text-dental-dark">{purchase.supplier}</td>
                         <td className="p-4">{purchase.totalOrders}</td>
                         <td className="p-4 font-medium">Rs. {purchase.totalAmount.toFixed(2)}</td>
@@ -587,8 +585,8 @@ const Reports = () => {
                         <td className="p-4">
                           <Badge className={
                             purchase.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
+                              ? "bg-green-100 hover:bg-green-100 text-green-800 cursor-default"
+                              : "bg-yellow-100 hover:bg-yellow-100 text-yellow-800 cursor-default"
                           }>
                             {purchase.status}
                           </Badge>
