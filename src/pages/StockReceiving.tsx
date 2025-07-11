@@ -48,7 +48,7 @@ const StockReceiving = () => {
           *,
           suppliers(name),
           purchase_orders(po_number),
-          stock_receipt_items(*)
+          stock_receipt_items(*, inventory_items(id, name))
         `).order('created_at', { ascending: false }),
         supabase.from('purchase_orders').select('*').eq('status', 'pending').order('po_number'),
         supabase.from('suppliers').select('*').order('name')

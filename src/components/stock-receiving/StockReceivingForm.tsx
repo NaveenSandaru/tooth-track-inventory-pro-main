@@ -214,18 +214,15 @@ export const StockReceivingForm = ({
     return receivingItems.filter(item => item.has_discrepancy).length;
   };
 
+  // File upload functionality is disabled
   const handleFileUpload = (fileType: 'invoice' | 'deliveryNote' | 'qcReport', file: File) => {
-    const uploadedFile: UploadedFile = {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      file: file
-    };
-    
-    setUploadedFiles(prev => ({
-      ...prev,
-      [fileType]: uploadedFile
-    }));
+    // Functionality disabled
+    toast({
+      title: "File Upload Disabled",
+      description: "File upload functionality is currently disabled.",
+      variant: "default"
+    });
+    return;
   };
 
   const removeFile = (fileType: 'invoice' | 'deliveryNote' | 'qcReport') => {
@@ -652,7 +649,7 @@ export const StockReceivingForm = ({
               <Label htmlFor="purchase_order_id">Linked PO Number</Label>
               <Select
                 value={formData.purchase_order_id}
-                onChange={(value) => setFormData({ ...formData, purchase_order_id: value })}
+                onValueChange={(value) => setFormData({ ...formData, purchase_order_id: value })}
                 disabled={receivingItems.length > 0 || readOnly}
               >
                 <SelectTrigger>
@@ -672,7 +669,7 @@ export const StockReceivingForm = ({
               <Label htmlFor="supplier_id">Supplier *</Label>
               <Select
                 value={formData.supplier_id}
-                onChange={(value) => setFormData({ ...formData, supplier_id: value })}
+                onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
                 disabled={formData.purchase_order_id !== '' || readOnly}
               >
                 <SelectTrigger>
@@ -710,23 +707,25 @@ export const StockReceivingForm = ({
             </div>
           </div>
 
-          {/* Document Upload Status */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Documentation</h3>
+          {/* Document Upload Status - DISABLED */}
+          <div className="space-y-4 opacity-50">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Documentation</h3>
+              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                File Upload Disabled
+              </Badge>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex items-center space-x-2">
                 <input
                   type="file"
-                  accept=".pdf, .doc, .docx, .jpg, .jpeg, .png"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleFileUpload('invoice', e.target.files[0]);
-                    }
-                  }}
-                  className="hidden"
-                  id="invoice-upload"
+                  id={`file-invoice`}
+                  className="sr-only"
+                  onChange={(e) => e.target.files && e.target.files[0] && handleFileUpload('invoice', e.target.files[0])}
+                  accept="application/pdf,image/*"
+                  disabled={true}
                 />
-                <label htmlFor="invoice-upload" className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-1 text-gray-400">
                   <Upload className="h-4 w-4" />
                   Invoice
                 </label>
@@ -742,6 +741,7 @@ export const StockReceivingForm = ({
               <div className="flex items-center space-x-2">
                 <input
                   type="file"
+                  id="delivery-note-upload"
                   accept=".pdf, .doc, .docx, .jpg, .jpeg, .png"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
@@ -749,9 +749,9 @@ export const StockReceivingForm = ({
                     }
                   }}
                   className="hidden"
-                  id="delivery-note-upload"
+                  disabled={true}
                 />
-                <label htmlFor="delivery-note-upload" className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 text-gray-400">
                   <Upload className="h-4 w-4" />
                   Delivery Note
                 </label>
@@ -767,6 +767,7 @@ export const StockReceivingForm = ({
               <div className="flex items-center space-x-2">
                 <input
                   type="file"
+                  id="qc-report-upload"
                   accept=".pdf, .doc, .docx, .jpg, .jpeg, .png"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
@@ -774,9 +775,9 @@ export const StockReceivingForm = ({
                     }
                   }}
                   className="hidden"
-                  id="qc-report-upload"
+                  disabled={true}
                 />
-                <label htmlFor="qc-report-upload" className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 text-gray-400">
                   <Upload className="h-4 w-4" />
                   QC Report
                 </label>

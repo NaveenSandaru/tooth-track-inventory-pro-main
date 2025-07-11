@@ -175,7 +175,7 @@ export const StockReceivingView = ({ receipt, isOpen, onOpenChange }: StockRecei
                     <tr key={index} className={item.has_discrepancy ? "bg-red-50" : ""}>
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {item.inventory_items?.name || "Unknown Item"}
+                          {item.inventory_items?.name || item.item_name || "Unknown Item"}
                         </div>
                         {item.remarks && (
                           <div className="text-xs text-gray-500 mt-1">{item.remarks}</div>

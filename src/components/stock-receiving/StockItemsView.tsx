@@ -94,7 +94,7 @@ export const StockItemsView = ({ receipt, isOpen, onOpenChange }: StockItemsView
                     >
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">
-                          {item.inventory_items?.name || "Unknown Item"}
+                          {item.inventory_items?.name || item.item_name || "Unknown Item"}
                         </div>
                         {item.condition !== 'good' && (
                           <Badge 
