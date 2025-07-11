@@ -695,6 +695,44 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_log: {
+        Row: {
+          id: string
+          action: string
+          item_id: string | null
+          item_name: string
+          quantity: string | null
+          user_name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          action: string
+          item_id?: string | null
+          item_name: string
+          quantity?: string | null
+          user_name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          action?: string
+          item_id?: string | null
+          item_name?: string
+          quantity?: string | null
+          user_name?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

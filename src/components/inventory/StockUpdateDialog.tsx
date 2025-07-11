@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { logActivity } from "@/lib/activity-logger";
 
 // Define the same custom type for consistency
 type InventoryItemWithRelations = Database["public"]["Tables"]["inventory_items"]["Row"] & {
@@ -75,6 +76,15 @@ export const StockUpdateDialog = ({ isOpen, onClose, item, suppliers, onUpdate }
 
         if (batchError) throw batchError;
       }
+
+      // Log the activity
+      await logActivity(
+        'Stock Added',
+        item.name,
+        'Staff User', // In a real app, you'd get this from the auth context
+        item.id,
+        `${quantityReceived} ${item.unit_of_measurement}`
+      );
 
       toast({
         title: "Success",

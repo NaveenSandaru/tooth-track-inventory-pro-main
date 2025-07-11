@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { logActivity } from "@/lib/activity-logger";
 
 // Define the same custom type for consistency
 type InventoryItemWithRelations = Database["public"]["Tables"]["inventory_items"]["Row"] & {
@@ -63,8 +64,14 @@ export const StockOutDialog = ({ isOpen, onClose, item, onUpdate }: StockOutDial
 
       if (updateError) throw updateError;
 
-      // Create stock out record (if you have a stock_out_log table)
-      // For now, we'll just update the inventory
+      // Log the activity
+      await logActivity(
+        'Stock Used',
+        item.name,
+        issuedTo || 'Staff User',
+        item.id,
+        `${quantityIssued} ${item.unit_of_measurement}`
+      );
 
       toast({
         title: "Success",
