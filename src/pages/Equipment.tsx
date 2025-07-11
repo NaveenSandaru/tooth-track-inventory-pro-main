@@ -116,7 +116,20 @@ const Equipment = () => {
     try {
       const { error } = await supabase
         .from('equipment_assets')
-        .update(formData)
+        .update({
+          name: formData.name,
+          category: formData.category,
+          brand: formData.brand,
+          model: formData.model,
+          serial_number: formData.serialNumber,
+          purchase_date: formData.purchaseDate,
+          purchase_price: formData.purchasePrice === '' ? null : Number(formData.purchasePrice),
+          warranty_start_date: formData.warrantyStart,
+          warranty_end_date: formData.warrantyEnd,
+          location: formData.location,
+          notes: formData.notes,
+          status: formData.status
+        })
         .eq('id', editEquipmentData.id);
 
       if (error) throw error;
@@ -134,41 +147,6 @@ const Equipment = () => {
       toast({
         title: "Error",
         description: "Failed to update equipment",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const addMaintenance = async (formData: any) => {
-    try {
-      const { error } = await supabase
-        .from('equipment_maintenance')
-        .insert([{
-          equipment_id: selectedEquipmentId,
-          maintenance_type: formData.maintenanceType,
-          description: formData.description,
-          maintenance_date: formData.maintenanceDate,
-          performed_by: formData.performedBy,
-          cost: formData.cost,
-          next_maintenance_date: formData.nextMaintenanceDate,
-          notes: formData.notes
-        }]);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Maintenance record added successfully"
-      });
-
-      setIsMaintenanceOpen(false);
-      setSelectedEquipmentId(null);
-      fetchEquipment();
-    } catch (error) {
-      console.error('Error adding maintenance:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add maintenance record",
         variant: "destructive"
       });
     }
@@ -193,12 +171,29 @@ const Equipment = () => {
       toast({ title: 'Success', description: 'Maintenance record updated.' });
       setIsEditMaintenanceOpen(false);
       setEditMaintenanceData(null);
+      
+      // Refresh the view dialog data
+      if (viewEquipmentData) {
+        const { data: refreshedData } = await supabase
+          .from('equipment_assets')
+          .select(`
+            *,
+            equipment_maintenance(*)
+          `)
+          .eq('id', viewEquipmentData.id)
+          .single();
+        if (refreshedData) {
+          setViewEquipmentData(refreshedData);
+        }
+      }
+      
       fetchEquipment();
     } catch (error) {
       console.error('Error updating maintenance:', error);
       toast({ title: 'Error', description: 'Failed to update maintenance record', variant: 'destructive' });
     }
   };
+
   const deleteMaintenance = async () => {
     try {
       if (!deleteMaintenanceData) return;
@@ -210,10 +205,76 @@ const Equipment = () => {
       toast({ title: 'Deleted', description: 'Maintenance record deleted.' });
       setIsDeleteMaintenanceOpen(false);
       setDeleteMaintenanceData(null);
+      
+      // Refresh the view dialog data
+      if (viewEquipmentData) {
+        const { data: refreshedData } = await supabase
+          .from('equipment_assets')
+          .select(`
+            *,
+            equipment_maintenance(*)
+          `)
+          .eq('id', viewEquipmentData.id)
+          .single();
+        if (refreshedData) {
+          setViewEquipmentData(refreshedData);
+        }
+      }
+      
       fetchEquipment();
     } catch (error) {
       console.error('Error deleting maintenance:', error);
       toast({ title: 'Error', description: 'Failed to delete maintenance record', variant: 'destructive' });
+    }
+  };
+
+  const addMaintenance = async (formData: any) => {
+    try {
+      const { error } = await supabase
+        .from('equipment_maintenance')
+        .insert([{
+          equipment_id: selectedEquipmentId,
+          maintenance_date: formData.maintenanceDate,
+          maintenance_type: formData.maintenanceType,
+          description: formData.description,
+          performed_by: formData.performedBy,
+          cost: formData.cost === '' ? null : Number(formData.cost),
+          next_maintenance_date: formData.nextMaintenanceDate,
+          notes: formData.notes
+        }]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Maintenance record added successfully"
+      });
+
+      setIsMaintenanceOpen(false);
+      
+      // Refresh the view dialog data if the maintenance was added to the currently viewed equipment
+      if (viewEquipmentData && selectedEquipmentId === viewEquipmentData.id) {
+        const { data: refreshedData } = await supabase
+          .from('equipment_assets')
+          .select(`
+            *,
+            equipment_maintenance(*)
+          `)
+          .eq('id', viewEquipmentData.id)
+          .single();
+        if (refreshedData) {
+          setViewEquipmentData(refreshedData);
+        }
+      }
+      
+      fetchEquipment();
+    } catch (error) {
+      console.error('Error adding maintenance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add maintenance record",
+        variant: "destructive"
+      });
     }
   };
 
@@ -267,7 +328,7 @@ const Equipment = () => {
         
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-dental-primary hover:bg-dental-secondary">
+            <Button className="bg-primary hover:bg-secondary">
               <Plus className="h-4 w-4 mr-2" />
               Add Equipment
             </Button>
@@ -357,7 +418,7 @@ const Equipment = () => {
                 <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+                <Button type="submit" className="bg-primary hover:bg-secondary">
                   Add Equipment
                 </Button>
               </div>
@@ -567,7 +628,7 @@ const Equipment = () => {
               <Button type="button" variant="outline" onClick={() => setIsMaintenanceOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+              <Button type="submit" className="bg-primary hover:bg-secondary">
                 Add Record
               </Button>
             </div>
@@ -788,7 +849,7 @@ const Equipment = () => {
               <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+              <Button type="submit" className="bg-primary hover:bg-secondary">
                 Save Changes
               </Button>
             </div>
@@ -826,7 +887,7 @@ const Equipment = () => {
             <Textarea name="notes" defaultValue={editMaintenanceData?.notes || ''} />
             <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={() => setIsEditMaintenanceOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-dental-primary">Save</Button>
+              <Button type="submit" className="bg-primary">Save</Button>
             </div>
           </form>
         </DialogContent>
@@ -859,7 +920,7 @@ const Equipment = () => {
             </p>
             {!searchTerm && statusFilter === "all" && (
               <Button 
-                className="bg-dental-primary hover:bg-dental-secondary"
+                className="bg-primary hover:bg-secondary"
                 onClick={() => setIsAddOpen(true)}
               >
                 <Plus className="h-4 w-4 mr-2" />
