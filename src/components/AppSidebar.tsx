@@ -39,23 +39,20 @@ const menuItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
-  const currentPath = location.pathname;
   const collapsed = state === "collapsed";
-
-  const isActive = (path: string) => currentPath === path;
-  const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive 
-      ? "bg-dental-primary text-white font-medium shadow-sm" 
-      : "hover:bg-blue-50 text-gray-700 hover:text-dental-primary";
+  const currentPath = location.pathname;
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-64"} collapsible="icon">
       <div className="p-4 border-b border-gray-200">
         <div className="flex flex-col items-center justify-center p-1">
-          <span className="mx-auto"><img src="/logo.png" alt="DentalTrack Pro Logo" className="h-16 w-16 object-contain" /></span>
-          <p className="text-sm text-gray-600 mt-1 p-2">Inventory Dashboard</p>
+          <span className="mx-auto">
+            <img src="/logo.png" alt="DentalTrack Pro Logo" className="h-16 w-16 object-contain" />
+          </span>
+          {!collapsed && (
+            <p className="text-sm text-gray-600 mt-1 p-2">Inventory Dashboard</p>
+          )}
         </div>
-        
       </div>
 
       <SidebarContent className="px-2 py-4">
@@ -65,22 +62,45 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      end 
-                      className={({ isActive }) => 
-                        `flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 ${getNavCls({ isActive })}`
-                      }
-                    >
-                      <item.icon className="h-5 w-5 flex-shrink-0" />
-                      {!collapsed && <span className="font-medium">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {menuItems.map((item) => {
+                const isActive = item.url === "/"
+                  ? currentPath === "/"
+                  : currentPath.startsWith(item.url);
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      {item.url.startsWith("http") ? (
+                        <a
+                          href={item.url}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-all duration-200 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? "text-emerald-600" : "text-gray-500"}`} />
+                          {!collapsed && <span>{item.title}</span>}
+                        </a>
+                      ) : (
+                        <NavLink
+                          to={item.url}
+                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-all duration-200 ${
+                            isActive
+                              ? "bg-emerald-100 text-emerald-700 border-l-4 border-emerald-500 shadow-sm"
+                              : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                          }`}
+                        >
+                          <item.icon
+                            className={`h-5 w-5 flex-shrink-0 ${
+                              isActive ? "text-emerald-600" : "text-gray-500"
+                            }`}
+                          />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      )}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
