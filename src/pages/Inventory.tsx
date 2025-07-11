@@ -645,6 +645,10 @@ const Inventory = () => {
         </CardContent>
       </Card>
 
+      <div className="p-0 m-0">
+        <span className="text-lg font-bold">Items :</span>
+      </div>
+
       {/* Inventory Items */}
       <Tabs defaultValue="grid" className="space-y-4">
         <TabsList>
