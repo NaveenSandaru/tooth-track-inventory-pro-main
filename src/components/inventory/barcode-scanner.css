@@ -1,0 +1,147 @@
+/* Custom styles for the barcode scanner */
+
+/* Override the default scanner styles */
+#qr-reader {
+  border: none !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+/* Style the scanner container */
+.scanner-container {
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Make the scanner more compact */
+.compact-scanner {
+  max-height: 300px !important;
+}
+
+/* Style the scanner header */
+#qr-reader__header {
+  background-color: #f3f4f6 !important;
+  padding: 4px !important;
+  font-size: 12px !important;
+  color: #4b5563 !important;
+  text-align: center !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* Style the scanner status */
+#qr-reader__status {
+  background-color: #f3f4f6 !important;
+  color: #4b5563 !important;
+  font-size: 12px !important;
+  padding: 4px !important;
+  text-align: center !important;
+}
+
+/* Style the scanner section */
+#qr-reader__scan_region {
+  background-color: #000 !important;
+  min-height: 200px !important;
+  max-height: 200px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Create a scanning animation */
+#qr-reader__scan_region::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+  animation: scanning 2s linear infinite;
+  z-index: 10;
+}
+
+@keyframes scanning {
+  0% {
+    top: 0;
+  }
+  50% {
+    top: 100%;
+  }
+  100% {
+    top: 0;
+  }
+}
+
+/* Style the file selection section */
+#qr-reader__dashboard {
+  padding: 4px !important;
+  background-color: #f9fafb !important;
+  border-top: 1px solid #e5e7eb !important;
+}
+
+/* Style the file selection button */
+#qr-reader__dashboard button {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  border: none !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  margin: 2px !important;
+  transition: background-color 0.2s !important;
+}
+
+#qr-reader__dashboard button:hover {
+  background-color: #2563eb !important;
+}
+
+/* Style the file input */
+#qr-reader__dashboard input[type="file"] {
+  width: 0.1px !important;
+  height: 0.1px !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  z-index: -1 !important;
+}
+
+/* Style the file input label */
+#qr-reader__dashboard input[type="file"] + span {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  border: none !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  display: inline-block !important;
+  margin: 2px !important;
+  transition: background-color 0.2s !important;
+}
+
+#qr-reader__dashboard input[type="file"] + span:hover {
+  background-color: #2563eb !important;
+}
+
+/* Style the torch button */
+#qr-reader__dashboard_section_swaplink {
+  color: #4b5563 !important;
+  text-decoration: none !important;
+  font-size: 12px !important;
+  margin: 4px 0 !important;
+  display: block !important;
+}
+
+/* Make the camera selection more visible */
+#qr-reader__dashboard_section_csr {
+  margin-bottom: 4px !important;
+}
+
+#qr-reader__dashboard_section_csr select {
+  padding: 4px !important;
+  border-radius: 4px !important;
+  border: 1px solid #d1d5db !important;
+  width: 100% !important;
+  max-width: 300px !important;
+  font-size: 12px !important;
+} 
