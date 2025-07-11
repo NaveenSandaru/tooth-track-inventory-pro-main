@@ -487,7 +487,6 @@ const Inventory = () => {
           </Dialog>
           <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-secondary">
               <Button className="bg-emerald-600 hover:bg-emerald-500">
                 <Plus className="h-4 w-4 mr-2" />
                 Add New Item
@@ -912,11 +911,10 @@ const Inventory = () => {
                     .eq('id', selectedItem.id);
                   if (error) throw error;
 
-                  // Log the activity
                   await logActivity(
                     'Item Updated',
                     formData.get('name') as string,
-                    'Staff User', // In a real app, you'd get this from the auth context
+                    'Staff User',
                     selectedItem.id,
                     null
                   );
@@ -1015,8 +1013,6 @@ const Inventory = () => {
       </Dialog>
       <Dialog open={isDeleteConfirmOpen} onOpenChange={(open) => {
         if (!open && selectedItem) {
-          // Only reset selectedItem when closing if we're in delete mode
-          // This prevents issues with other dialogs that use selectedItem
           setIsDeleteConfirmOpen(false);
         } else {
           setIsDeleteConfirmOpen(open);
@@ -1041,6 +1037,6 @@ const Inventory = () => {
       </Dialog>
     </div>
   );
-};
+}
 
 export default Inventory;

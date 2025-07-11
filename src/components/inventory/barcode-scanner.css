@@ -80,7 +80,7 @@
 
 /* Style the file selection button */
 #qr-reader__dashboard button {
-  background-color: #3b82f6 !important;
+  background-color: #059669 !important;
   color: white !important;
   border: none !important;
   padding: 4px 8px !important;
@@ -92,7 +92,7 @@
 }
 
 #qr-reader__dashboard button:hover {
-  background-color: #2563eb !important;
+  background-color: #10b981 !important;
 }
 
 /* Style the file input */
