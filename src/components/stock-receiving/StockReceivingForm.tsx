@@ -17,6 +17,8 @@ interface StockReceivingFormProps {
   onSuccess: () => void;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  initialData?: any; // For editing or viewing existing records
+  readOnly?: boolean; // For view-only mode
 }
 
 interface ReceivingItem {
@@ -48,7 +50,9 @@ export const StockReceivingForm = ({
   purchaseOrders, 
   onSuccess, 
   isOpen, 
-  onOpenChange 
+  onOpenChange,
+  initialData = null,
+  readOnly = false
 }: StockReceivingFormProps) => {
   const [formData, setFormData] = useState({
     purchase_order_id: '',
@@ -70,6 +74,73 @@ export const StockReceivingForm = ({
     qcReport: null
   });
   const { toast } = useToast();
+
+  // Initialize form with initialData if provided (for editing or viewing)
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        purchase_order_id: initialData.purchase_order_id || '',
+        supplier_id: initialData.supplier_id || '',
+        receipt_date: initialData.receipt_date || new Date().toISOString().split('T')[0],
+        received_by: initialData.received_by || '',
+        notes: initialData.notes || ''
+      });
+      
+      // Load receipt items
+      const loadReceiptItems = async () => {
+        try {
+          const { data: itemsData, error } = await supabase
+            .from('stock_receipt_items')
+            .select(`
+              *,
+              inventory_items(name)
+            `)
+            .eq('stock_receipt_id', initialData.id);
+          
+          if (error) throw error;
+          
+          if (itemsData && itemsData.length > 0) {
+            const items: ReceivingItem[] = itemsData.map((item: any, index: number) => ({
+              id: `${index + 1}`,
+              inventory_item_id: item.inventory_item_id || '',
+              item_name: item.inventory_items?.name || 'Unknown Item',
+              quantity_ordered: item.quantity_ordered,
+              quantity_received: item.quantity,
+              unit_of_measure: item.unit_of_measure || 'units',
+              batch_number: item.batch_number || '',
+              lot_number: item.lot_number || '',
+              manufacture_date: item.manufacture_date || '',
+              expiry_date: item.expiry_date || '',
+              condition: item.condition || 'good',
+              storage_location: item.storage_location || '',
+              remarks: item.remarks || '',
+              has_discrepancy: item.has_discrepancy || false
+            }));
+            
+            setReceivingItems(items);
+          }
+          
+          // Set uploaded file indicators
+          if (initialData.invoice_uploaded || initialData.delivery_note_uploaded || initialData.qc_report_uploaded) {
+            setUploadedFiles({
+              invoice: initialData.invoice_uploaded ? { name: 'Invoice', size: 0, type: '', file: null as any } : null,
+              deliveryNote: initialData.delivery_note_uploaded ? { name: 'Delivery Note', size: 0, type: '', file: null as any } : null,
+              qcReport: initialData.qc_report_uploaded ? { name: 'QC Report', size: 0, type: '', file: null as any } : null
+            });
+          }
+        } catch (error) {
+          console.error('Error loading receipt items:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load receipt items",
+            variant: "destructive"
+          });
+        }
+      };
+      
+      loadReceiptItems();
+    }
+  }, [initialData]);
 
   // Load PO items when PO is selected
   useEffect(() => {
@@ -143,18 +214,15 @@ export const StockReceivingForm = ({
     return receivingItems.filter(item => item.has_discrepancy).length;
   };
 
+  // File upload functionality is disabled
   const handleFileUpload = (fileType: 'invoice' | 'deliveryNote' | 'qcReport', file: File) => {
-    const uploadedFile: UploadedFile = {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      file: file
-    };
-    
-    setUploadedFiles(prev => ({
-      ...prev,
-      [fileType]: uploadedFile
-    }));
+    // Functionality disabled
+    toast({
+      title: "File Upload Disabled",
+      description: "File upload functionality is currently disabled.",
+      variant: "default"
+    });
+    return;
   };
 
   const removeFile = (fileType: 'invoice' | 'deliveryNote' | 'qcReport') => {
@@ -195,6 +263,84 @@ export const StockReceivingForm = ({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // If we're in readOnly mode, don't submit
+    if (readOnly) {
+      e.preventDefault();
+      onOpenChange(false);
+      return;
+    }
+    
+    // If we're editing an existing receipt
+    if (initialData) {
+      e.preventDefault();
+      
+      try {
+        // Update the stock receipt
+        const { error: updateError } = await supabase
+          .from('stock_receipts')
+          .update({
+            supplier_id: formData.supplier_id,
+            receipt_date: formData.receipt_date,
+            received_by: formData.received_by || null,
+            notes: formData.notes || ''
+          })
+          .eq('id', initialData.id);
+          
+        if (updateError) throw updateError;
+        
+        // Update each receipt item
+        for (const item of receivingItems) {
+          const itemId = item.id;
+          // Find the corresponding item in the database based on position in array
+          const { data: existingItems, error: findError } = await supabase
+            .from('stock_receipt_items')
+            .select('id')
+            .eq('stock_receipt_id', initialData.id);
+            
+          if (findError) throw findError;
+          
+          if (existingItems && existingItems.length > 0) {
+            const existingItemId = existingItems[parseInt(item.id) - 1]?.id;
+            
+            if (existingItemId) {
+              await supabase
+                .from('stock_receipt_items')
+                .update({
+                  quantity: Number(item.quantity_received),
+                  batch_number: item.batch_number || null,
+                  lot_number: item.lot_number || null,
+                  manufacture_date: item.manufacture_date || null,
+                  expiry_date: item.expiry_date || null,
+                  condition: item.condition || 'good',
+                  storage_location: item.storage_location || null,
+                  remarks: item.remarks || null,
+                  has_discrepancy: Boolean(item.has_discrepancy)
+                })
+                .eq('id', existingItemId);
+            }
+          }
+        }
+        
+        toast({
+          title: "Success",
+          description: `Stock receipt ${initialData.receipt_number} updated successfully`
+        });
+        
+        onSuccess();
+        onOpenChange(false);
+        
+      } catch (error) {
+        console.error('Error updating stock receipt:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update stock receipt",
+          variant: "destructive"
+        });
+      }
+      
+      return;
+    }
+    
     e.preventDefault();
     
     // Basic validation
@@ -482,20 +628,29 @@ export const StockReceivingForm = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Receive Stock</DialogTitle>
-          <DialogDescription>Record received inventory items with detailed tracking</DialogDescription>
+          <DialogTitle>
+            {readOnly ? 'View Stock Receipt' : initialData ? 'Edit Stock Receipt' : 'Receive Stock Inventory'}
+          </DialogTitle>
+          <DialogDescription>
+            {readOnly
+              ? 'View details of received inventory'
+              : initialData
+              ? 'Update received inventory details'
+              : 'Record received inventory with batch tracking and documentation'}
+          </DialogDescription>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
+
+        <form onSubmit={handleSubmit} className="space-y-6" data-read-only={readOnly ? 'true' : 'false'}>
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="purchase_order_id">Linked PO Number</Label>
-              <Select 
-                value={formData.purchase_order_id} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, purchase_order_id: value }))}
+              <Select
+                value={formData.purchase_order_id}
+                onValueChange={(value) => setFormData({ ...formData, purchase_order_id: value })}
+                disabled={receivingItems.length > 0 || readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select PO (optional)" />
@@ -509,13 +664,13 @@ export const StockReceivingForm = ({
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="supplier_id">Supplier *</Label>
-              <Select 
-                value={formData.supplier_id} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, supplier_id: value }))}
-                required
+              <Select
+                value={formData.supplier_id}
+                onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
+                disabled={formData.purchase_order_id !== '' || readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select supplier" />
@@ -529,46 +684,48 @@ export const StockReceivingForm = ({
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="receipt_date">Receipt Date *</Label>
               <Input
                 id="receipt_date"
                 type="date"
                 value={formData.receipt_date}
-                onChange={(e) => setFormData(prev => ({ ...prev, receipt_date: e.target.value }))}
-                required
+                onChange={(e) => setFormData({ ...formData, receipt_date: e.target.value })}
+                readOnly={readOnly}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="received_by">Received By</Label>
               <Input
-                id="received_by"
+                placeholder="John Doe"
                 value={formData.received_by}
-                onChange={(e) => setFormData(prev => ({ ...prev, received_by: e.target.value }))}
-                placeholder="Staff name"
+                onChange={(e) => setFormData({ ...formData, received_by: e.target.value })}
+                readOnly={readOnly}
               />
             </div>
           </div>
 
-          {/* Document Upload Status */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Documentation</h3>
+          {/* Document Upload Status - DISABLED */}
+          <div className="space-y-4 opacity-50">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Documentation</h3>
+              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                File Upload Disabled
+              </Badge>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex items-center space-x-2">
                 <input
                   type="file"
-                  accept=".pdf, .doc, .docx, .jpg, .jpeg, .png"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleFileUpload('invoice', e.target.files[0]);
-                    }
-                  }}
-                  className="hidden"
-                  id="invoice-upload"
+                  id={`file-invoice`}
+                  className="sr-only"
+                  onChange={(e) => e.target.files && e.target.files[0] && handleFileUpload('invoice', e.target.files[0])}
+                  accept="application/pdf,image/*"
+                  disabled={true}
                 />
-                <label htmlFor="invoice-upload" className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-1 text-gray-400">
                   <Upload className="h-4 w-4" />
                   Invoice
                 </label>
@@ -580,10 +737,11 @@ export const StockReceivingForm = ({
                   </Badge>
                 )}
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input
                   type="file"
+                  id="delivery-note-upload"
                   accept=".pdf, .doc, .docx, .jpg, .jpeg, .png"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
@@ -591,9 +749,9 @@ export const StockReceivingForm = ({
                     }
                   }}
                   className="hidden"
-                  id="delivery-note-upload"
+                  disabled={true}
                 />
-                <label htmlFor="delivery-note-upload" className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 text-gray-400">
                   <Upload className="h-4 w-4" />
                   Delivery Note
                 </label>
@@ -605,10 +763,11 @@ export const StockReceivingForm = ({
                   </Badge>
                 )}
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input
                   type="file"
+                  id="qc-report-upload"
                   accept=".pdf, .doc, .docx, .jpg, .jpeg, .png"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
@@ -616,9 +775,9 @@ export const StockReceivingForm = ({
                     }
                   }}
                   className="hidden"
-                  id="qc-report-upload"
+                  disabled={true}
                 />
-                <label htmlFor="qc-report-upload" className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 text-gray-400">
                   <Upload className="h-4 w-4" />
                   QC Report
                 </label>
@@ -638,27 +797,27 @@ export const StockReceivingForm = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Received Items</h3>
-                {getDiscrepancyCount() > 0 && (
+                {receivingItems.some((item) => item.has_discrepancy) && (
                   <Badge variant="destructive" className="flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
-                    {getDiscrepancyCount()} Discrepancies
+                    {receivingItems.filter((item) => item.has_discrepancy).length} Discrepancies
                   </Badge>
                 )}
               </div>
 
               <div className="space-y-4">
                 {receivingItems.map((item, index) => (
-                  <div 
-                    key={item.id} 
-                    className={`border rounded-lg p-4 space-y-4 ${item.has_discrepancy ? 'border-red-300 bg-red-50' : ''}`}
+                  <div
+                    key={item.id}
+                    className={`border rounded-lg p-4 space-y-4 ${
+                      item.has_discrepancy ? 'border-red-300 bg-red-50' : ''
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <h4 className="font-medium">{item.item_name}</h4>
-                      {item.has_discrepancy && (
-                        <Badge variant="destructive">Discrepancy</Badge>
-                      )}
+                      {item.has_discrepancy && <Badge variant="destructive">Discrepancy</Badge>}
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label>Quantity Ordered</Label>
@@ -669,32 +828,35 @@ export const StockReceivingForm = ({
                           className="bg-gray-50"
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Quantity Received *</Label>
                         <Input
                           type="number"
                           min="0"
                           value={item.quantity_received}
-                          onChange={(e) => updateReceivingItem(item.id, 'quantity_received', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateReceivingItem(item.id, 'quantity_received', Number(e.target.value))}
+                          readOnly={readOnly}
                           className={item.has_discrepancy ? 'border-red-300' : ''}
                           required
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Unit of Measure</Label>
                         <Input
                           value={item.unit_of_measure}
                           onChange={(e) => updateReceivingItem(item.id, 'unit_of_measure', e.target.value)}
+                          readOnly={readOnly}
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Condition</Label>
                         <Select
                           value={item.condition}
                           onValueChange={(value) => updateReceivingItem(item.id, 'condition', value)}
+                          disabled={readOnly}
                         >
                           <SelectTrigger>
                             <SelectValue />
@@ -706,59 +868,65 @@ export const StockReceivingForm = ({
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Batch Number</Label>
                         <Input
                           value={item.batch_number}
                           onChange={(e) => updateReceivingItem(item.id, 'batch_number', e.target.value)}
+                          readOnly={readOnly}
                           placeholder="Batch number"
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Lot Number</Label>
                         <Input
                           value={item.lot_number}
                           onChange={(e) => updateReceivingItem(item.id, 'lot_number', e.target.value)}
+                          readOnly={readOnly}
                           placeholder="Lot number"
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Manufacture Date</Label>
                         <Input
                           type="date"
                           value={item.manufacture_date}
                           onChange={(e) => updateReceivingItem(item.id, 'manufacture_date', e.target.value)}
+                          readOnly={readOnly}
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Expiry Date</Label>
                         <Input
                           type="date"
                           value={item.expiry_date}
                           onChange={(e) => updateReceivingItem(item.id, 'expiry_date', e.target.value)}
+                          readOnly={readOnly}
                         />
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Storage Location</Label>
                         <Input
                           value={item.storage_location}
                           onChange={(e) => updateReceivingItem(item.id, 'storage_location', e.target.value)}
+                          readOnly={readOnly}
                           placeholder="e.g., Room 1 Cabinet A"
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Remarks</Label>
                         <Textarea
                           value={item.remarks}
                           onChange={(e) => updateReceivingItem(item.id, 'remarks', e.target.value)}
+                          readOnly={readOnly}
                           placeholder="Special notes or observations"
                         />
                       </div>
@@ -774,21 +942,26 @@ export const StockReceivingForm = ({
             <Textarea
               id="notes"
               value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="General notes about the receipt"
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              readOnly={readOnly}
+              placeholder="Any special instructions or notes about this receipt..."
             />
           </div>
 
-          <div className="flex justify-end space-x-2">
+          <div className="flex justify-end space-x-3 mt-6">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {readOnly ? 'Close' : 'Cancel'}
             </Button>
-            <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
-              Create Stock Receipt
-            </Button>
+            {!readOnly && (
+              <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+                {initialData ? 'Update Receipt' : 'Save Receipt'}
+              </Button>
+            )}
           </div>
         </form>
       </DialogContent>
     </Dialog>
   );
 };
+
+export default StockReceivingForm;

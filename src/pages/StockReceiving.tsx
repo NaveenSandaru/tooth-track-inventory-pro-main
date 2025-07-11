@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { StockReceivingForm } from "@/components/stock-receiving/StockReceivingForm";
+import { StockReceivingView } from "@/components/stock-receiving/StockReceivingView";
+import { StockItemsView } from "@/components/stock-receiving/StockItemsView";
 import { 
   Plus, 
   Search, 
@@ -25,6 +27,10 @@ import {
 const StockReceiving = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isItemsOpen, setIsItemsOpen] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [stockReceipts, setStockReceipts] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -42,7 +48,7 @@ const StockReceiving = () => {
           *,
           suppliers(name),
           purchase_orders(po_number),
-          stock_receipt_items(*)
+          stock_receipt_items(*, inventory_items(id, name))
         `).order('created_at', { ascending: false }),
         supabase.from('purchase_orders').select('*').eq('status', 'pending').order('po_number'),
         supabase.from('suppliers').select('*').order('name')
@@ -85,6 +91,24 @@ const StockReceiving = () => {
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
+
+  // Handler for viewing a receipt
+  const handleViewReceipt = (receipt) => {
+    setSelectedReceipt(receipt);
+    setIsViewOpen(true);
+  };
+
+  // Handler for editing a receipt
+  const handleEditReceipt = (receipt) => {
+    setSelectedReceipt(receipt);
+    setIsEditOpen(true);
+  };
+  
+  // Handler for viewing receipt items
+  const handleViewItems = (receipt) => {
+    setSelectedReceipt(receipt);
+    setIsItemsOpen(true);
+  };
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -202,15 +226,30 @@ const StockReceiving = () => {
               </div>
 
               <div className="flex items-center space-x-2 pt-2">
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => handleViewReceipt(receipt)}
+                >
                   <Eye className="h-4 w-4 mr-1" />
                   View
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => handleEditReceipt(receipt)}
+                >
                   <Edit className="h-4 w-4 mr-1" />
                   Edit
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => handleViewItems(receipt)}
+                >
                   <Package className="h-4 w-4 mr-1" />
                   Items
                 </Button>
@@ -250,12 +289,37 @@ const StockReceiving = () => {
         </Card>
       )}
 
+      {/* Form for creating new stock receipts */}
       <StockReceivingForm
         suppliers={suppliers}
         purchaseOrders={purchaseOrders}
         onSuccess={fetchData}
         isOpen={isAddOpen}
         onOpenChange={setIsAddOpen}
+      />
+      
+      {/* View modal for stock receipts */}
+      <StockReceivingView
+        receipt={selectedReceipt}
+        isOpen={isViewOpen}
+        onOpenChange={setIsViewOpen}
+      />
+      
+      {/* Form for editing existing stock receipts */}
+      <StockReceivingForm
+        suppliers={suppliers}
+        purchaseOrders={purchaseOrders}
+        onSuccess={fetchData}
+        isOpen={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        initialData={selectedReceipt}
+      />
+      
+      {/* Items view for stock receipts */}
+      <StockItemsView
+        receipt={selectedReceipt}
+        isOpen={isItemsOpen}
+        onOpenChange={setIsItemsOpen}
       />
     </div>
   );
