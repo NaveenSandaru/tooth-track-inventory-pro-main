@@ -152,11 +152,11 @@ const Reports = () => {
       }
 
       const formattedReports = data.map(item => {
-        let type = "info"; // Default if stock is fine
+        let type = "info";
 
         if (item.current_stock <= 0) {
           type = "critical";
-        } else if (item.current_stock < item.minimum_stock) {
+        } else if (item.current_stock <= item.minimum_stock) {
           type = "warning";
         }
 
@@ -340,7 +340,7 @@ const Reports = () => {
     try {
       const { data: inventoryItems, error: inventoryError } = await supabase
         .from("inventory_items")
-        .select("current_stock, unit_price, expiry_date");
+        .select("current_stock, unit_price, expiry_date, minimum_stock");
 
       if (inventoryError) throw inventoryError;
 
@@ -357,7 +357,7 @@ const Reports = () => {
         const price = parseFloat(item.unit_price) || 0;
         totalValue += stock * price;
 
-        if (item.minimum_stock && stock < item.minimum_stock) lowStock++;
+        if (item.minimum_stock && stock <= item.minimum_stock) lowStock++;
 
         if (item.expiry_date && new Date(item.expiry_date) <= expiryThreshold) expiring++;
       });
@@ -393,7 +393,7 @@ const Reports = () => {
     fetchUsageReports();
     fetchPurchaseReports();
     fetchQuickStats();
-  }, [])
+  }, []);
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
