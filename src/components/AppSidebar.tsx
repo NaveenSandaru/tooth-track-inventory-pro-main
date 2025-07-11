@@ -11,6 +11,8 @@ import {
   Shield,
   ArrowBigLeft,
   Stethoscope,
+  ShoppingCart,
+  PackageCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -28,8 +30,8 @@ import {
 const menuItems = [
   { title: "Dashboard", url: "/", icon: Archive },
   { title: "Inventory", url: "/inventory", icon: Package },
-  { title: "Purchase Orders", url: "/purchase-orders", icon: FileText },
-  { title: "Stock Receiving", url: "/stock-receiving", icon: Package },
+  { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
+  { title: "Stock Receiving", url: "/stock-receiving", icon: PackageCheck },
   { title: "Equipment", url: "/equipment", icon: Stethoscope },
   { title: "Suppliers", url: "/suppliers", icon: Shield },
   { title: "Reports", url: "/reports", icon: FileText },

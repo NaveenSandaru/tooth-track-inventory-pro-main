@@ -299,7 +299,6 @@ const StockReceiving = () => {
                   onClick={() => handleViewReceipt(receipt)}
                 >
                   <Eye className="h-4 w-4 mr-1" />
-                  View
                 </Button>
                 <Button 
                   variant="outline" 
@@ -308,7 +307,6 @@ const StockReceiving = () => {
                   onClick={() => handleEditReceipt(receipt)}
                 >
                   <Edit className="h-4 w-4 mr-1" />
-                  Edit
                 </Button>
                 <Button 
                   variant="outline" 
@@ -317,7 +315,6 @@ const StockReceiving = () => {
                   onClick={() => handleViewItems(receipt)}
                 >
                   <Package className="h-4 w-4 mr-1" />
-                  Items
                 </Button>
                 <Button 
                   variant="outline" 
@@ -329,7 +326,6 @@ const StockReceiving = () => {
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
                 </Button>
               </div>
 
