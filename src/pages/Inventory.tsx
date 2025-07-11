@@ -478,7 +478,7 @@ const Inventory = () => {
                   <Button type="button" variant="outline" onClick={() => setIsAddCategoryOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+                  <Button type="submit" className="bg-primary hover:bg-secondary">
                     Add Category
                   </Button>
                 </div>
@@ -487,6 +487,7 @@ const Inventory = () => {
           </Dialog>
           <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
             <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-secondary">
               <Button className="bg-emerald-600 hover:bg-emerald-500">
                 <Plus className="h-4 w-4 mr-2" />
                 Add New Item
@@ -592,7 +593,7 @@ const Inventory = () => {
                   <Button type="button" variant="outline" onClick={() => setIsAddItemOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+                  <Button type="submit" className="bg-primary hover:bg-secondary">
                     Add Item
                   </Button>
                 </div>
@@ -816,7 +817,7 @@ const Inventory = () => {
                   Scan Product
                 </Button>
                 <Button 
-                  className="bg-dental-primary hover:bg-dental-secondary"
+                  className="bg-primary hover:bg-secondary"
                   onClick={() => setIsAddItemOpen(true)}
                 >
                   <Plus className="h-4 w-4 mr-2" />
