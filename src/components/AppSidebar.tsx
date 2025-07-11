@@ -32,7 +32,7 @@ const menuItems = [
   { title: "Equipment", url: "/equipment", icon: Settings },
   { title: "Suppliers", url: "/suppliers", icon: Shield },
   { title: "Reports", url: "/reports", icon: FileText },
-  { title: "Settings", url: "/settings", icon: Settings },
+ /* { title: "Settings", url: "/settings", icon: Settings },*/
   { title: "Back To Admin Portal", url: "http://localhost:3001", icon: ArrowBigLeft },
 ];
 

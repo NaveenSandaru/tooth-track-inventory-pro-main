@@ -168,7 +168,7 @@ const PurchaseOrders = () => {
         </div>
         
         <Button 
-          className="bg-dental-primary hover:bg-dental-secondary"
+          className="bg-primary hover:bg-secondary"
           onClick={() => setIsAddOpen(true)}
         >
           <Plus className="h-4 w-4 mr-2" />
