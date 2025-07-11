@@ -670,7 +670,7 @@ export const StockReceivingForm = ({
               <Select
                 value={formData.supplier_id}
                 onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
-                disabled={formData.purchase_order_id !== '' || readOnly}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select supplier" />
