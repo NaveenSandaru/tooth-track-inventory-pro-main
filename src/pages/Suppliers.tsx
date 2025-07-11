@@ -111,7 +111,7 @@ function SupplierForm({ initial, onSubmit, onCancel }: {
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+        <Button type="submit" className="bg-primary hover:bg-secondary">
           Save
         </Button>
       </div>
@@ -531,7 +531,7 @@ const Suppliers = () => {
             </p>
             {!searchTerm && (
               <Button 
-                className="bg-dental-primary hover:bg-dental-secondary"
+                className="bg-primary hover:bg-secondary"
                 onClick={() => setIsAddSupplierOpen(true)}
               >
                 <Plus className="h-4 w-4 mr-2" />
