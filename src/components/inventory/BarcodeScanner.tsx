@@ -91,7 +91,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
       <DialogContent className="max-w-md p-4">
         <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2 text-lg">
-            <Scan className="h-4 w-4 text-dental-primary" />
+            <Scan className="h-4 w-4 text-emerald-600" />
             Scan Barcode/QR Code
           </DialogTitle>
           <DialogDescription className="text-xs">
@@ -103,8 +103,8 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
           {/* Scanner Tips - More compact */}
           <div className="bg-blue-50 p-2 border border-blue-200 rounded-md">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-              <div className="text-xs text-blue-700">
+              <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-emerald-600">
                 <span className="font-medium">Tips:</span> Ensure good lighting • Hold steady • Position barcode in box • Use torch if needed
               </div>
             </div>
@@ -123,7 +123,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
             <Button 
               variant="default" 
               onClick={handleClose} 
-              className="bg-dental-primary hover:bg-dental-secondary h-8 text-sm px-3"
+              className="bg-emerald-600 hover:bg-emerald-500 h-8 text-sm px-3"
             >
               <X className="h-3 w-3 mr-1" />
               Close

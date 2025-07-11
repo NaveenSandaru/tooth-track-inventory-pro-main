@@ -487,7 +487,7 @@ const Inventory = () => {
           </Dialog>
           <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-dental-primary hover:bg-dental-secondary">
+              <Button className="bg-emerald-600 hover:bg-emerald-500">
                 <Plus className="h-4 w-4 mr-2" />
                 Add New Item
               </Button>
@@ -1030,7 +1030,7 @@ const Inventory = () => {
               <div>Are you sure you want to delete <b>{selectedItem.name}</b>?</div>
               <div className="flex justify-end gap-2 mt-4">
                 <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>Cancel</Button>
-                <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+                <Button variant="destructive" onClick={confirmDelete} className="bg-emerald-600 hover:bg-emerald-500">Delete</Button>
               </div>
             </>
           ) : (

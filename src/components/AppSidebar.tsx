@@ -10,6 +10,7 @@ import {
   Bell,
   Shield,
   ArrowBigLeft,
+  Stethoscope,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,7 +30,7 @@ const menuItems = [
   { title: "Inventory", url: "/inventory", icon: Package },
   { title: "Purchase Orders", url: "/purchase-orders", icon: FileText },
   { title: "Stock Receiving", url: "/stock-receiving", icon: Package },
-  { title: "Equipment", url: "/equipment", icon: Settings },
+  { title: "Equipment", url: "/equipment", icon: Stethoscope },
   { title: "Suppliers", url: "/suppliers", icon: Shield },
   { title: "Reports", url: "/reports", icon: FileText },
  /* { title: "Settings", url: "/settings", icon: Settings },*/
