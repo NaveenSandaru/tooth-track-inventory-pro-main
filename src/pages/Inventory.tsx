@@ -26,7 +26,8 @@ import {
   Tag,
   Download,
   Eye,
-  Minus
+  Minus,
+  X
 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { BarcodeScanner } from "@/components/inventory/BarcodeScanner";
@@ -330,19 +331,56 @@ const Inventory = () => {
   };
 
   const handleDelete = (item: InventoryItemWithRelations) => {
+    if (!item || !item.id) {
+      toast({ 
+        title: "Error", 
+        description: "Invalid item selected for deletion", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    // Set the selected item and open the confirmation dialog
     setSelectedItem(item);
     setIsDeleteConfirmOpen(true);
   };
 
   const confirmDelete = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem) {
+      console.error("No item selected for deletion");
+      toast({ 
+        title: "Error", 
+        description: "No item selected for deletion", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     try {
       // Store item details before deletion for activity log
       const itemName = selectedItem.name;
       const itemId = selectedItem.id;
 
-      const { error } = await supabase.from('inventory_items').delete().eq('id', selectedItem.id);
-      if (error) throw error;
+      const { error } = await supabase
+        .from('inventory_items')
+        .delete()
+        .eq('id', itemId);
+        
+      if (error) {
+        console.error("Delete error:", error);
+        
+        // Check for foreign key constraint errors
+        if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
+          toast({ 
+            title: "Cannot Delete", 
+            description: "This item is referenced by other records (like purchase orders or stock receipts). Please remove those references first.", 
+            variant: "destructive" 
+          });
+          return;
+        }
+        
+        throw error;
+      }
 
       // Log the activity
       await logActivity(
@@ -358,7 +396,12 @@ const Inventory = () => {
       setSelectedItem(null);
       fetchData();
     } catch (error) {
-      toast({ title: "Error", description: "Failed to delete item", variant: "destructive" });
+      console.error("Error deleting item:", error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to delete item. Please try again.", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -375,9 +418,13 @@ const Inventory = () => {
           <p className="text-gray-600 mt-1">Manage your dental clinic's inventory with barcode scanning</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" className="bg-dental-accent hover:bg-dental-accent/80" onClick={() => setIsScannerOpen(true)}>
-            <Scan className="h-4 w-4 mr-2" />
-            Scan Product
+          <Button 
+            variant="default" 
+            className="bg-dental-accent hover:bg-dental-accent/80 flex items-center gap-2 px-4" 
+            onClick={() => setIsScannerOpen(true)}
+          >
+            <Scan className="h-4 w-4" />
+            <span>Scan Product Barcode</span>
           </Button>
           <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
             <DialogTrigger asChild>
@@ -567,6 +614,16 @@ const Inventory = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  onClick={() => setSearchTerm("")}
+                >
+                  <X className="h-4 w-4 text-gray-500" />
+                </Button>
+              )}
             </div>
             <div className="flex space-x-2">
               <Select value={filterCategory} onValueChange={setFilterCategory}>
@@ -955,16 +1012,30 @@ const Inventory = () => {
           )}
         </DialogContent>
       </Dialog>
-      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={(open) => {
+        if (!open && selectedItem) {
+          // Only reset selectedItem when closing if we're in delete mode
+          // This prevents issues with other dialogs that use selectedItem
+          setIsDeleteConfirmOpen(false);
+        } else {
+          setIsDeleteConfirmOpen(open);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Item</DialogTitle>
           </DialogHeader>
-          <div>Are you sure you want to delete <b>{selectedItem?.name}</b>?</div>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
-          </div>
+          {selectedItem ? (
+            <>
+              <div>Are you sure you want to delete <b>{selectedItem.name}</b>?</div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>Cancel</Button>
+                <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+              </div>
+            </>
+          ) : (
+            <div>No item selected. Please try again.</div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
