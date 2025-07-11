@@ -524,7 +524,7 @@ export const PurchaseOrderForm = ({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Order Items</h3>
-              <Button type="button" onClick={addOrderItem} variant="outline" size="sm">
+              <Button type="button" className="bg-emerald-200 hover:bg-emerald-300" onClick={addOrderItem} variant="outline" size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Item
               </Button>
@@ -782,7 +782,7 @@ export const PurchaseOrderForm = ({
             </Button>
             <Button 
               type="submit" 
-              className="bg-dental-primary hover:bg-dental-secondary"
+              className="bg-primary hover:bg-secondary"
               disabled={!isFormValid() || isSubmitting}
             >
               {isSubmitting ? 'Creating...' : 'Create Purchase Order'}
