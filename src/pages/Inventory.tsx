@@ -46,6 +46,7 @@ const Inventory = () => {
   const [filterCategory, setFilterCategory] = useState("all");
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [isAddParentCategoryOpen, setIsAddParentCategoryOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isStockUpdateOpen, setIsStockUpdateOpen] = useState(false);
   const [isStockOutOpen, setIsStockOutOpen] = useState(false);
@@ -59,6 +60,11 @@ const Inventory = () => {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [currentView, setCurrentView] = useState<'items' | 'categories' | 'parent-categories'>('items');
+  const [newParentCategory, setNewParentCategory] = useState({
+    name: "",
+    description: ""
+  });
 
   useEffect(() => {
     fetchData();
@@ -302,6 +308,141 @@ const Inventory = () => {
     }
   };
 
+  const handleAddParentCategory = async () => {
+    if (newParentCategory.name.trim()) {
+      try {
+        const { error } = await supabase
+          .from('inventory_categories')
+          .insert([{
+            name: newParentCategory.name.trim(),
+            description: newParentCategory.description.trim() || null,
+            parent_category_id: null // This ensures it's a parent category
+          }]);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Parent category added successfully"
+        });
+
+        setNewParentCategory({ name: "", description: "" });
+        setIsAddParentCategoryOpen(false);
+        fetchData(); // Refresh the list
+      } catch (error) {
+        console.error('Error adding parent category:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add parent category",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleDeleteParentCategory = async (categoryId: string) => {
+    try {
+      // First check if this category has any sub-categories
+      const { data: subCategories, error: subError } = await supabase
+        .from('inventory_categories')
+        .select('id')
+        .eq('parent_category_id', categoryId);
+
+      if (subError) throw subError;
+
+      if (subCategories && subCategories.length > 0) {
+        toast({
+          title: "Cannot Delete",
+          description: "This category has sub-categories. Please delete sub-categories first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check if any items are using this category
+      const { data: items, error: itemsError } = await supabase
+        .from('inventory_items')
+        .select('id')
+        .eq('category_id', categoryId);
+
+      if (itemsError) throw itemsError;
+
+      if (items && items.length > 0) {
+        toast({
+          title: "Cannot Delete",
+          description: "This category has items assigned to it. Please reassign items first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Delete the category
+      const { error } = await supabase
+        .from('inventory_categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Parent category deleted successfully"
+      });
+
+      fetchData(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting parent category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete parent category",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    try {
+      // Check if any items are using this category
+      const { data: items, error: itemsError } = await supabase
+        .from('inventory_items')
+        .select('id')
+        .eq('category_id', categoryId);
+
+      if (itemsError) throw itemsError;
+
+      if (items && items.length > 0) {
+        toast({
+          title: "Cannot Delete",
+          description: "This category has items assigned to it. Please reassign items first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Delete the category
+      const { error } = await supabase
+        .from('inventory_categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Category deleted successfully"
+      });
+
+      fetchData(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete category",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getStatusBadge = (item: InventoryItemWithRelations) => {
     if (item.current_stock === 0) {
       return <Badge className="status-indicator status-out-of-stock">Out of Stock</Badge>;
@@ -410,427 +551,267 @@ const Inventory = () => {
   }
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
-      {/* Header */}
+    <div className="p-6 space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
         <div>
           <h1 className="text-3xl font-bold text-dental-dark">Inventory Management</h1>
-          <p className="text-gray-600 mt-1">Manage your dental clinic's inventory with barcode scanning</p>
-        </div>
-        <div className="flex flex-col md:flex-row space-y-4 md:space-x-2">
-          <Button 
-            variant="default" 
-            className="bg-dental-accent hover:bg-dental-accent/80 flex items-center gap-2 px-4 md:mt-4" 
-            onClick={() => setIsScannerOpen(true)}
-          >
-            <Scan className="h-4 w-4" />
-            <span>Scan Product Barcode</span>
-          </Button>
-          <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Tag className="h-4 w-4 mr-2" />
-                Add Category
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Category</DialogTitle>
-                <DialogDescription>
-                  Create a new inventory category
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                const formData = new FormData(form);
-                addCategory({
-                  name: formData.get('name'),
-                  description: formData.get('description'),
-                  parentId: formData.get('parentId')
-                });
-              }} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Category Name *</Label>
-                  <Input name="name" placeholder="e.g., Orthodontics" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="parentId">Parent Category</Label>
-                  <Select name="parentId">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select parent (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Parent (Top-level category)</SelectItem>
-                      {getParentCategories().map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea name="description" placeholder="Category description..." />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsAddCategoryOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="bg-primary hover:bg-secondary">
-                    Add Category
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-emerald-600 hover:bg-emerald-500">
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Item
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Add New Inventory Item</DialogTitle>
-                <DialogDescription>
-                  Enter the details for the new inventory item
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                const formData = new FormData(form);
-                addItem({
-                  name: formData.get('name'),
-                  description: formData.get('description'),
-                  categoryId: formData.get('categoryId'),
-                  currentStock: formData.get('currentStock'),
-                  minimumStock: formData.get('minimumStock'),
-                  unit: formData.get('unit'),
-                  unitPrice: formData.get('unitPrice'),
-                  supplierId: formData.get('supplierId'),
-                  barcode: formData.get('barcode'),
-                  trackBatches: formData.get('trackBatches') === 'on',
-                  alertExpiryDays: formData.get('alertExpiryDays'),
-                  location: formData.get('location')
-                });
-              }} className="grid grid-cols-2 gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="itemName">Item Name *</Label>
-                  <Input name="name" placeholder="Enter item name" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="categoryId">Category *</Label>
-                  <Select name="categoryId" required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {getCategoryDisplayName(category.id)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="currentStock">Current Stock *</Label>
-                  <Input name="currentStock" type="number" placeholder="0" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="minimumStock">Minimum Stock *</Label>
-                  <Input name="minimumStock" type="number" placeholder="0" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unit">Unit of Measurement</Label>
-                  <Input name="unit" placeholder="e.g., boxes, pieces, tubes" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unitPrice">Unit Price (Rs. )</Label>
-                  <Input name="unitPrice" type="number" step="0.01" placeholder="0.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="supplierId">Supplier</Label>
-                  <Select name="supplierId">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="location">Storage Location</Label>
-                  <Input name="location" placeholder="e.g., Storage Room A" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="barcode">Barcode/QR Code</Label>
-                  <Input name="barcode" placeholder="Item barcode or QR code" defaultValue={scannedCode} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="alertExpiryDays">Expiry Alert Days</Label>
-                  <Input name="alertExpiryDays" type="number" placeholder="30" defaultValue="30" />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea name="description" placeholder="Optional item description" />
-                </div>
-                <div className="col-span-2 flex items-center space-x-2">
-                  <Switch name="trackBatches" />
-                  <Label htmlFor="trackBatches">Enable batch tracking for this item</Label>
-                </div>
-                <div className="col-span-2 flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsAddItemOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="bg-primary hover:bg-secondary">
-                    Add Item
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <p className="text-gray-600 mt-1">Manage your inventory items and categories</p>
         </div>
       </div>
 
-      {/* Filters and Search */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search by name, description, or barcode..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-              {searchTerm && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                  onClick={() => setSearchTerm("")}
-                >
-                  <X className="h-4 w-4 text-gray-500" />
-                </Button>
-              )}
-            </div>
-            <div className="flex space-x-2">
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-48">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {getCategoryDisplayName(category.id)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="p-0 m-0">
-        <span className="text-lg font-bold">Items :</span>
-      </div>
-
-      {/* Inventory Items */}
-      <Tabs defaultValue="grid" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="grid">Grid View</TabsTrigger>
-          <TabsTrigger value="table">Table View</TabsTrigger>
+      <Tabs value={currentView} onValueChange={(value: any) => setCurrentView(value)}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="items">Items</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="parent-categories">Parent Categories</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="grid">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems.map((item) => (
-              <Card key={item.id} className="card-hover">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg font-semibold line-clamp-2">
-                        {item.name}
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        {item.category_id ? getCategoryDisplayName(item.category_id) : 'Uncategorized'} • {item.supplier?.name || 'No supplier'}
-                      </CardDescription>
-                    </div>
-                    {getStatusBadge(item)}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-600">Current Stock</p>
-                      <p className="font-semibold text-dental-dark">
-                        {item.current_stock} {item.unit_of_measurement || 'units'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Min. Stock</p>
-                      <p className="font-semibold text-dental-dark">
-                        {item.minimum_stock} {item.unit_of_measurement || 'units'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Unit Price</p>
-                      <p className="font-semibold text-dental-dark">
-                        Rs. {item.unit_price || '0.00'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Location</p>
-                      <p className="font-semibold text-dental-dark">
-                        {item.location || 'Not set'}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {(item.barcode || item.qr_code) && (
-                    <div className="flex items-center space-x-2 text-sm bg-gray-50 p-2 rounded">
-                      <Scan className="h-4 w-4 text-gray-500" />
-                      <span className="text-gray-600">Code: {item.barcode || item.qr_code}</span>
-                    </div>
-                  )}
+        <TabsContent value="items" className="space-y-4">
+          {/* Existing items content */}
+          <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-2 justify-end">
+            <Button onClick={() => setIsScannerOpen(true)}>
+              <Scan className="h-4 w-4 mr-2" />
+              Scan Item
+            </Button>
+            <Button onClick={() => setIsAddItemOpen(true)} className="bg-emerald-600 hover:bg-emerald-500">
+              <Plus className="h-4 w-4 mr-2" />
+              Add New Item
+            </Button>
+          </div>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search items..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filter by category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
-                  {item.track_batches && (
-                    <div className="flex items-center space-x-2 text-sm">
-                      <Package className="h-4 w-4 text-dental-primary" />
-                      <span className="text-dental-primary">Batch tracking enabled</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {inventoryItems
+              .filter(item => 
+                (filterCategory === "all" || item.category_id === filterCategory) &&
+                (searchTerm === "" || 
+                  item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  item.description?.toLowerCase().includes(searchTerm.toLowerCase()))
+              )
+              .map((item) => (
+                <Card key={item.id} className="flex flex-col">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{item.name}</CardTitle>
+                        <CardDescription>
+                          {item.inventory_categories?.name || "Uncategorized"}
+                        </CardDescription>
+                      </div>
+                      {getStatusBadge(item)}
                     </div>
-                  )}
-
-                  <div className="flex items-center space-x-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleView(item)}>
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEdit(item)}>
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button variant="outline" size="sm" className="text-amber-600 hover:text-amber-700" onClick={() => handleStockOut(item)}>
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleDelete(item)}>
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <p className="text-sm">
+                        Stock: {item.current_stock} {item.unit_of_measurement}
+                      </p>
+                      <p className="text-sm">
+                        Min. Stock: {item.minimum_stock} {item.unit_of_measurement}
+                      </p>
+                      {item.supplier && (
+                        <p className="text-sm">Supplier: {item.supplier.name}</p>
+                      )}
+                    </div>
+                  </CardContent>
+                  <CardContent className="pt-0">
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleView(item)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(item)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleStockOut(item)}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(item)}
+                        className="text-red-500 hover:text-red-600"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
           </div>
         </TabsContent>
 
-        <TabsContent value="table">
+        <TabsContent value="categories">
           <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="text-left p-4 font-semibold text-gray-900">Item Name</th>
-                      <th className="text-left p-4 font-semibold text-gray-900">Category</th>
-                      <th className="text-left p-4 font-semibold text-gray-900">Stock</th>
-                      <th className="text-left p-4 font-semibold text-gray-900">Min. Stock</th>
-                      <th className="text-left p-4 font-semibold text-gray-900">Unit Price</th>
-                      <th className="text-left p-4 font-semibold text-gray-900">Status</th>
-                      <th className="text-left p-4 font-semibold text-gray-900">Code</th>
-                      <th className="text-left p-4 font-semibold text-gray-900">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filteredItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="p-4">
-                          <div>
-                            <p className="font-medium text-dental-dark">{item.name}</p>
-                            <p className="text-sm text-gray-600">{item.description}</p>
-                          </div>
-                        </td>
-                        <td className="p-4 text-gray-900">{item.category_id ? getCategoryDisplayName(item.category_id) : 'Uncategorized'}</td>
-                        <td className="p-4">
-                          <span className="font-medium">{item.current_stock}</span> {item.unit_of_measurement || 'units'}
-                        </td>
-                        <td className="p-4">
-                          <span className="font-medium">{item.minimum_stock}</span> {item.unit_of_measurement || 'units'}
-                        </td>
-                        <td className="p-4 font-medium">Rs. {item.unit_price || '0.00'}</td>
-                        <td className="p-4">{getStatusBadge(item)}</td>
-                        <td className="p-4 text-gray-900">{item.barcode || item.qr_code || 'N/A'}</td>
-                        <td className="p-4">
-                          <div className="flex space-x-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleView(item)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-amber-600" onClick={() => handleStockOut(item)}>
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(item)}>
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Categories</CardTitle>
+              <div className="flex items-center space-x-2">
+                <Button onClick={() => setIsAddCategoryOpen(true)} className="bg-emerald-600 hover:bg-emerald-500">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Category
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categories.filter(cat => cat.parent_category_id !== null).map((category) => (
+                  <Card key={category.id} className="flex flex-col">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{category.name}</CardTitle>
+                          <CardDescription>
+                            Parent: {categories.find(c => c.id === category.parent_category_id)?.name || 'None'}
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteParentCategory(category.id)}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    {category.description && (
+                      <CardContent>
+                        <p className="text-sm text-gray-600">{category.description}</p>
+                      </CardContent>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="parent-categories">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Parent Categories</CardTitle>
+              <div className="flex items-center space-x-2">
+                <Button onClick={() => setIsAddParentCategoryOpen(true)} className="bg-emerald-600 hover:bg-emerald-500">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Parent Category
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categories.filter(cat => cat.parent_category_id === null).map((category) => (
+                  <Card key={category.id} className="flex flex-col">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{category.name}</CardTitle>
+                          <CardDescription>
+                            {getSubCategories(category.id).length} sub-categories
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteParentCategory(category.id)}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    {category.description && (
+                      <CardContent>
+                        <p className="text-sm text-gray-600">{category.description}</p>
+                      </CardContent>
+                    )}
+                  </Card>
+                ))}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {filteredItems.length === 0 && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No items found</h3>
-            <p className="text-gray-600 mb-4">
-              {searchTerm || filterCategory !== "all" 
-                ? "Try adjusting your filters or search terms"
-                : "Get started by scanning a product or adding your first inventory item"
-              }
-            </p>
-            {!searchTerm && filterCategory === "all" && (
-              <div className="flex justify-center space-x-2">
-                <Button 
-                  variant="outline"
-                  onClick={() => setIsScannerOpen(true)}
-                >
-                  <Scan className="h-4 w-4 mr-2" />
-                  Scan Product
+      {/* Add Parent Category Dialog */}
+      <Dialog open={isAddParentCategoryOpen} onOpenChange={setIsAddParentCategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Parent Category</DialogTitle>
+            <DialogDescription>
+              Create a new parent category for organizing inventory items
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); handleAddParentCategory(); }}>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Category Name</Label>
+                <Input
+                  id="name"
+                  value={newParentCategory.name}
+                  onChange={(e) => setNewParentCategory(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Enter category name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={newParentCategory.description}
+                  onChange={(e) => setNewParentCategory(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter category description"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setIsAddParentCategoryOpen(false)}>
+                  Cancel
                 </Button>
-                <Button 
-                  className="bg-primary hover:bg-secondary"
-                  onClick={() => setIsAddItemOpen(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Item
+                <Button type="submit" className="bg-primary hover:bg-secondary">
+                  Add Parent Category
                 </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Barcode Scanner Component */}
       <BarcodeScanner
@@ -881,6 +862,211 @@ const Inventory = () => {
               <p><b>Barcode:</b> {selectedItem.barcode}</p>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Item Dialog */}
+      <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Item</DialogTitle>
+            <DialogDescription>
+              Add a new item to your inventory
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e: React.FormEvent) => { 
+            e.preventDefault(); 
+            const form = e.target as HTMLFormElement;
+            addItem(Object.fromEntries(new FormData(form))); 
+          }} className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Item Name *</Label>
+                <Input id="name" name="name" required placeholder="Enter item name" />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea id="description" name="description" placeholder="Enter item description" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="categoryId">Category *</Label>
+                  <Select name="categoryId" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="supplierId">Supplier *</Label>
+                  <Select name="supplierId" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="currentStock">Current Stock *</Label>
+                  <Input
+                    id="currentStock"
+                    name="currentStock"
+                    type="number"
+                    min="0"
+                    required
+                    placeholder="Enter current stock"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="minimumStock">Minimum Stock *</Label>
+                  <Input
+                    id="minimumStock"
+                    name="minimumStock"
+                    type="number"
+                    min="0"
+                    required
+                    placeholder="Enter minimum stock"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unit">Unit of Measurement *</Label>
+                  <Input
+                    id="unit"
+                    name="unit"
+                    required
+                    placeholder="e.g., pieces, boxes"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="unitPrice">Unit Price *</Label>
+                  <Input
+                    id="unitPrice"
+                    name="unitPrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    placeholder="Enter unit price"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="location">Storage Location</Label>
+                <Input
+                  id="location"
+                  name="location"
+                  placeholder="Enter storage location"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Switch id="trackBatches" name="trackBatches" />
+                  <Label htmlFor="trackBatches">Track Batches</Label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="alertExpiryDays">Alert Days Before Expiry</Label>
+                <Input
+                  id="alertExpiryDays"
+                  name="alertExpiryDays"
+                  type="number"
+                  min="0"
+                  placeholder="Default: 30 days"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsAddItemOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500">
+                  Add Item
+                </Button>
+              </div>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Category Dialog */}
+      <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Category</DialogTitle>
+            <DialogDescription>
+              Create a new category for organizing inventory items
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e: React.FormEvent) => { 
+            e.preventDefault(); 
+            const form = e.target as HTMLFormElement;
+            addCategory(Object.fromEntries(new FormData(form))); 
+          }}>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Category Name *</Label>
+                <Input id="name" name="name" required placeholder="Enter category name" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea id="description" name="description" placeholder="Enter category description" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="parentId">Parent Category</Label>
+                <Select name="parentId" defaultValue="none">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select parent category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {getParentCategories().map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setIsAddCategoryOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500">
+                  Add Category
+                </Button>
+              </div>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
