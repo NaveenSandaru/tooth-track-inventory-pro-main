@@ -721,24 +721,6 @@ const Inventory = () => {
                       )}
                     </div>
                   </CardContent>
-                  {item.track_batches && <CardContent>
-                    <div className="space-y-2">
-                      <p className="text-sm">
-                        Batch Number: {
-                          batches.find(b => b.inventory_item_id === item.id)?.batch_number || "N/A"
-                        }
-                      </p>
-                      <p className="text-sm">
-                        Expiry Date: {
-                          batches.find(b => b.inventory_item_id === item.id)?.expiry_date || "N/A"
-                        }
-                      </p>
-                      <p className="text-sm">
-                        Quantity Remaining: {item.current_stock} {item.unit_of_measurement}
-                      </p>                    
-                    </div>
-                  </CardContent>}
-
                   <CardContent className="pt-0">
                     <div className="flex justify-end space-x-2">
                       <Button
