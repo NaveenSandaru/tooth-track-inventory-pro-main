@@ -719,6 +719,9 @@ const Inventory = () => {
                       {item.supplier && (
                         <p className="text-sm">Supplier: {item.supplier.name}</p>
                       )}
+                      {item.barcode && (
+                        <p className="text-sm">Barcode: {item.barcode}</p>
+                      )}
                     </div>
                   </CardContent>
                   <CardContent className="pt-0">
@@ -1061,10 +1064,12 @@ const Inventory = () => {
               <Label htmlFor="description">Description</Label>
               <Textarea name="description" placeholder="Enter item description" />
             </div>
+            {/*}
             <div className="col-span-2 flex items-center space-x-2">
               <Switch name="trackBatches" />
               <Label htmlFor="trackBatches">Enable batch tracking for this item</Label>
             </div>
+            {*/}
             <div className="col-span-2 flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={() => setIsAddItemOpen(false)}>
                 Cancel
