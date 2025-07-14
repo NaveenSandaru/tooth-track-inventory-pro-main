@@ -734,11 +734,8 @@ const Inventory = () => {
                         }
                       </p>
                       <p className="text-sm">
-                        Quantity Remaining: {
-                          batches.find(b => b.inventory_item_id === item.id)?.quantity_remaining || "N/A"
-                        }
-                      </p>
-                      
+                        Quantity Remaining: {item.current_stock} {item.unit_of_measurement}
+                      </p>                    
                     </div>
                   </CardContent>}
 
