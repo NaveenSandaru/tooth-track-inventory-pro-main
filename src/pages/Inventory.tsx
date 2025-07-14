@@ -216,6 +216,10 @@ const Inventory = () => {
     return categories.filter((category) => category.parent_category_id === null);
   };
 
+  const getItemsInCategory = (categoryId: string) => {
+    return inventoryItems.filter(item => item.category_id === categoryId);
+  };
+
   // Get sub-categories for a specific parent
   const getSubCategories = (parentId: string) => {
     return categories.filter((category) => category.parent_category_id === parentId);
@@ -706,7 +710,7 @@ const Inventory = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteParentCategory(category.id)}
+                          onClick={() => handleDeleteCategory(category.id)}
                           className="text-red-500 hover:text-red-600"
                         >
                           <Trash className="h-4 w-4" />
@@ -714,10 +718,28 @@ const Inventory = () => {
                       </div>
                     </CardHeader>
                     {category.description && (
-                      <CardContent>
+                      <CardContent className="pb-2">
                         <p className="text-sm text-gray-600">{category.description}</p>
                       </CardContent>
                     )}
+                    <CardContent>
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-semibold">Items in this category:</h4>
+                        <div className="max-h-40 overflow-y-auto">
+                          {getItemsInCategory(category.id).length > 0 ? (
+                            <ul className="list-disc list-inside space-y-1">
+                              {getItemsInCategory(category.id).map(item => (
+                                <li key={item.id} className="text-sm">
+                                  {item.name} ({item.current_stock} {item.unit_of_measurement})
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-sm text-gray-500">No items in this category</p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
                   </Card>
                 ))}
               </div>
@@ -759,10 +781,31 @@ const Inventory = () => {
                       </div>
                     </CardHeader>
                     {category.description && (
-                      <CardContent>
+                      <CardContent className="pb-2">
                         <p className="text-sm text-gray-600">{category.description}</p>
                       </CardContent>
                     )}
+                    <CardContent>
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-semibold">Sub-categories:</h4>
+                        <div className="max-h-40 overflow-y-auto">
+                          {getSubCategories(category.id).length > 0 ? (
+                            <ul className="list-disc list-inside space-y-1">
+                              {getSubCategories(category.id).map(subCategory => {
+                                const itemCount = getItemsInCategory(subCategory.id).length;
+                                return (
+                                  <li key={subCategory.id} className="text-sm">
+                                    {subCategory.name} ({itemCount} {itemCount === 1 ? 'item' : 'items'})
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : (
+                            <p className="text-sm text-gray-500">No sub-categories</p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
                   </Card>
                 ))}
               </div>
