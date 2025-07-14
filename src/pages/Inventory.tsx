@@ -11,13 +11,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Package, 
-  Edit, 
-  Trash, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Package,
+  Edit,
+  Trash,
   AlertTriangle,
   Calendar,
   Archive,
@@ -66,8 +66,11 @@ const Inventory = () => {
     description: ""
   });
 
+  const [batches, setBatches] = useState<Database["public"]["Tables"]["inventory_batches"]["Row"][]>([]);
+
   useEffect(() => {
     fetchData();
+    fetchBatches();
   }, []);
 
   const fetchData = async () => {
@@ -86,39 +89,39 @@ const Inventory = () => {
         // Check for items that are now below minimum stock
         const items = itemsResponse.data as InventoryItemWithRelations[];
         setInventoryItems(items);
-        
+
         // Get the last known stock alerts to avoid duplicates
         const { data: recentAlerts } = await supabase
           .from('activity_log')
           .select('item_id, created_at, action')
           .in('action', ['Stock Alert', 'Item Expired'])
           .order('created_at', { ascending: false });
-        
+
         // Create maps of the most recent alert times for each item by alert type
         const lastAlertTimeMap = new Map();
         const lastExpiredTimeMap = new Map();
-        
+
         if (recentAlerts) {
           recentAlerts.forEach(alert => {
             if (alert.item_id) {
-              if (alert.action === 'Stock Alert' && 
-                  (!lastAlertTimeMap.has(alert.item_id) || 
-                   new Date(alert.created_at) > new Date(lastAlertTimeMap.get(alert.item_id)))) {
+              if (alert.action === 'Stock Alert' &&
+                (!lastAlertTimeMap.has(alert.item_id) ||
+                  new Date(alert.created_at) > new Date(lastAlertTimeMap.get(alert.item_id)))) {
                 lastAlertTimeMap.set(alert.item_id, alert.created_at);
               }
-              
-              if (alert.action === 'Item Expired' && 
-                  (!lastExpiredTimeMap.has(alert.item_id) || 
-                   new Date(alert.created_at) > new Date(lastExpiredTimeMap.get(alert.item_id)))) {
+
+              if (alert.action === 'Item Expired' &&
+                (!lastExpiredTimeMap.has(alert.item_id) ||
+                  new Date(alert.created_at) > new Date(lastExpiredTimeMap.get(alert.item_id)))) {
                 lastExpiredTimeMap.set(alert.item_id, alert.created_at);
               }
             }
           });
         }
-        
+
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Set to beginning of day for comparison
-        
+
         // Check for items below minimum stock and log alerts if needed
         for (const item of items) {
           // Check for low stock
@@ -127,9 +130,9 @@ const Inventory = () => {
             // 1. We've never logged an alert for this item, or
             // 2. The last alert was more than 24 hours ago
             const lastAlertTime = lastAlertTimeMap.get(item.id);
-            const shouldLogAlert = !lastAlertTime || 
+            const shouldLogAlert = !lastAlertTime ||
               (new Date().getTime() - new Date(lastAlertTime).getTime() > 24 * 60 * 60 * 1000);
-            
+
             if (shouldLogAlert) {
               await logActivity(
                 'Stock Alert',
@@ -140,20 +143,20 @@ const Inventory = () => {
               );
             }
           }
-          
+
           // Check for expired items
           if (item.expiry_date) {
             const expiryDate = new Date(item.expiry_date);
             expiryDate.setHours(0, 0, 0, 0); // Set to beginning of day for comparison
-            
+
             if (expiryDate <= today) {
               // Only log a new expiry alert if:
               // 1. We've never logged an expiry for this item, or
               // 2. The last expiry alert was more than 24 hours ago
               const lastExpiredTime = lastExpiredTimeMap.get(item.id);
-              const shouldLogExpiry = !lastExpiredTime || 
+              const shouldLogExpiry = !lastExpiredTime ||
                 (new Date().getTime() - new Date(lastExpiredTime).getTime() > 24 * 60 * 60 * 1000);
-              
+
               if (shouldLogExpiry) {
                 await logActivity(
                   'Item Expired',
@@ -167,7 +170,7 @@ const Inventory = () => {
           }
         }
       }
-      
+
       if (categoriesResponse.data) setCategories(categoriesResponse.data);
       if (suppliersResponse.data) setSuppliers(suppliersResponse.data);
     } catch (error) {
@@ -182,11 +185,32 @@ const Inventory = () => {
     }
   };
 
+  const fetchBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory_batches')
+        .select("*");
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setBatches(data);
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleScanResult = (code: string) => {
     setScannedCode(code);
-    
+
     // Check if product exists
-    const existingItem = inventoryItems.find(item => 
+    const existingItem = inventoryItems.find(item =>
       item.barcode === code || item.qr_code === code
     );
 
@@ -263,6 +287,57 @@ const Inventory = () => {
           data[0].id,
           `Initial stock: ${formData.currentStock} ${formData.unit || 'units'}`
         );
+      }
+
+      if (formData.trackBatches) {
+
+        const alertDays = parseInt(formData.alertExpiryDays) || 30;
+        const today = new Date();
+        const alertExpiryDate = new Date(today);
+        alertExpiryDate.setDate(alertExpiryDate.getDate() + alertDays);
+
+        const response = await supabase
+          .from("inventory_batches")
+          .select("*", { count: "exact", head: true })
+          .eq("inventory_item_id", data[0].id);
+
+        if (response.error) {
+          throw new Error(response.error.toString());
+        }
+
+        const response2 = await supabase
+          .from("inventory_batches")
+          .select("*", { count: "exact", head: true })
+
+        if (response2.error) {
+          throw new Error(response2.error.toString());
+        }
+
+        const batch_number = `${data[0].name.slice(0, 4)}${(response.count + 1)}`;
+        const lot_number = ((response2.count) + 1).toString();
+
+        const { error: insertError } = await supabase
+          .from("inventory_batches")
+          .insert([
+            {
+              inventory_item_id: data[0].id,
+              batch_number: batch_number,
+              lot_number: lot_number,
+              manufacture_date: formData.manufacturer_date,
+              expiry_date: alertExpiryDate.toISOString().split('T')[0],
+              quantity_received: parseInt(formData.currentStock),
+              quantity_remaining: parseInt(formData.currentStock),
+              unit_cost: parseFloat(formData.unitPrice),
+              supplier_id: formData.supplierId,
+              received_date: new Date().toDateString().split("T")[0],
+              created_at: new Date()
+            }
+          ]);
+
+        if (insertError) {
+          console.log(insertError);
+          throw new Error("Error adding batch info");
+        }
       }
 
       toast({
@@ -459,8 +534,8 @@ const Inventory = () => {
 
   const filteredItems = inventoryItems.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.barcode?.toLowerCase().includes(searchTerm.toLowerCase());
+      item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.barcode?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === "all" || item.category_id === filterCategory;
     return matchesSearch && matchesCategory;
   });
@@ -477,14 +552,14 @@ const Inventory = () => {
 
   const handleDelete = (item: InventoryItemWithRelations) => {
     if (!item || !item.id) {
-      toast({ 
-        title: "Error", 
-        description: "Invalid item selected for deletion", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: "Invalid item selected for deletion",
+        variant: "destructive"
       });
       return;
     }
-    
+
     // Set the selected item and open the confirmation dialog
     setSelectedItem(item);
     setIsDeleteConfirmOpen(true);
@@ -493,14 +568,14 @@ const Inventory = () => {
   const confirmDelete = async () => {
     if (!selectedItem) {
       console.error("No item selected for deletion");
-      toast({ 
-        title: "Error", 
-        description: "No item selected for deletion", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: "No item selected for deletion",
+        variant: "destructive"
       });
       return;
     }
-    
+
     try {
       // Store item details before deletion for activity log
       const itemName = selectedItem.name;
@@ -510,20 +585,20 @@ const Inventory = () => {
         .from('inventory_items')
         .delete()
         .eq('id', itemId);
-        
+
       if (error) {
         console.error("Delete error:", error);
-        
+
         // Check for foreign key constraint errors
         if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
-          toast({ 
-            title: "Cannot Delete", 
-            description: "This item is referenced by other records (like purchase orders or stock receipts). Please remove those references first.", 
-            variant: "destructive" 
+          toast({
+            title: "Cannot Delete",
+            description: "This item is referenced by other records (like purchase orders or stock receipts). Please remove those references first.",
+            variant: "destructive"
           });
           return;
         }
-        
+
         throw error;
       }
 
@@ -542,10 +617,10 @@ const Inventory = () => {
       fetchData();
     } catch (error) {
       console.error("Error deleting item:", error);
-      toast({ 
-        title: "Error", 
-        description: "Failed to delete item. Please try again.", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: "Failed to delete item. Please try again.",
+        variant: "destructive"
       });
     }
   };
@@ -582,7 +657,7 @@ const Inventory = () => {
               Add New Item
             </Button>
           </div>
-          
+
           <Card>
             <CardContent className="p-4">
               <div className="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
@@ -614,9 +689,9 @@ const Inventory = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {inventoryItems
-              .filter(item => 
+              .filter(item =>
                 (filterCategory === "all" || item.category_id === filterCategory) &&
-                (searchTerm === "" || 
+                (searchTerm === "" ||
                   item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   item.description?.toLowerCase().includes(searchTerm.toLowerCase()))
               )
@@ -646,6 +721,27 @@ const Inventory = () => {
                       )}
                     </div>
                   </CardContent>
+                  {item.track_batches && <CardContent>
+                    <div className="space-y-2">
+                      <p className="text-sm">
+                        Batch Number: {
+                          batches.find(b => b.inventory_item_id === item.id)?.batch_number || "N/A"
+                        }
+                      </p>
+                      <p className="text-sm">
+                        Expiry Date: {
+                          batches.find(b => b.inventory_item_id === item.id)?.expiry_date || "N/A"
+                        }
+                      </p>
+                      <p className="text-sm">
+                        Quantity Remaining: {
+                          batches.find(b => b.inventory_item_id === item.id)?.quantity_remaining || "N/A"
+                        }
+                      </p>
+                      
+                    </div>
+                  </CardContent>}
+
                   <CardContent className="pt-0">
                     <div className="flex justify-end space-x-2">
                       <Button
@@ -915,10 +1011,10 @@ const Inventory = () => {
             <DialogTitle>Add New Item</DialogTitle>
             <DialogDescription>Add a new item to your inventory</DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e: React.FormEvent) => { 
-            e.preventDefault(); 
+          <form onSubmit={(e: React.FormEvent) => {
+            e.preventDefault();
             const form = e.target as HTMLFormElement;
-            addItem(Object.fromEntries(new FormData(form))); 
+            addItem(Object.fromEntries(new FormData(form)));
           }} className="grid grid-cols-2 gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">Item Name *</Label>
@@ -1011,10 +1107,10 @@ const Inventory = () => {
               Create a new category for organizing inventory items
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e: React.FormEvent) => { 
-            e.preventDefault(); 
+          <form onSubmit={(e: React.FormEvent) => {
+            e.preventDefault();
             const form = e.target as HTMLFormElement;
-            addCategory(Object.fromEntries(new FormData(form))); 
+            addCategory(Object.fromEntries(new FormData(form)));
           }}>
             <div className="space-y-4">
               <div className="space-y-2">
