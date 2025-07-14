@@ -417,7 +417,7 @@ const Inventory = () => {
           <h1 className="text-3xl font-bold text-dental-dark">Inventory Management</h1>
           <p className="text-gray-600 mt-1">Manage your dental clinic's inventory with barcode scanning</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col md:flex-row space-y-4 md:space-x-2">
           <Button 
             variant="default" 
             className="bg-dental-accent hover:bg-dental-accent/80 flex items-center gap-2 px-4" 
