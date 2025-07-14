@@ -420,7 +420,7 @@ const Inventory = () => {
         <div className="flex flex-col md:flex-row space-y-4 md:space-x-2">
           <Button 
             variant="default" 
-            className="bg-dental-accent hover:bg-dental-accent/80 flex items-center gap-2 px-4" 
+            className="bg-dental-accent hover:bg-dental-accent/80 flex items-center gap-2 px-4 md:mt-4" 
             onClick={() => setIsScannerOpen(true)}
           >
             <Scan className="h-4 w-4" />
