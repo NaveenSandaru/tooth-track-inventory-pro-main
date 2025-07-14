@@ -1072,11 +1072,11 @@ const Inventory = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="barcode">Barcode/SKU</Label>
-              <Input name="barcode" placeholder="Enter barcode or SKU" />
+              <Input name="barcode" placeholder="Enter barcode or SKU" defaultValue={scannedCode} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="alertExpiryDays">Expiry Alert Days</Label>
-              <Input name="alertExpiryDays" type="number" min="0" placeholder="Default: 30 days" />
+              <Input name="alertExpiryDays" type="number" min="0" placeholder="Default: 30 days" defaultValue={30} />
             </div>
             <div className="col-span-2 space-y-2">
               <Label htmlFor="description">Description</Label>
