@@ -56,10 +56,10 @@ export function AppSidebar() {
         <Button
           variant="ghost"
           size="icon"
-          className="fixed -top-1 left-1 z-50"
+          className="md:hidden fixed top-4 left-4 z-[100] bg-white shadow-md border"
           onClick={() => setOpenMobile(true)}
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-5 w-5" />
         </Button>
       )}
       <Sidebar 

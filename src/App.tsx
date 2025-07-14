@@ -27,7 +27,7 @@ const App = () => (
         <SidebarProvider>
           <div className="min-h-screen flex w-full bg-dental-light">
             <AppSidebar />
-            <main className="flex-1 overflow-auto">
+            <main className="flex-1 overflow-auto pt-8 md:pt-0 lg:pt-0">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/inventory" element={<Inventory />} />
