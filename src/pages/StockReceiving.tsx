@@ -35,6 +35,7 @@ import {
   Upload,
   Truck
 } from "lucide-react";
+import { Database } from "@/integrations/supabase/types";
 
 const StockReceiving = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,10 +49,12 @@ const StockReceiving = () => {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [batches, setBatches] = useState<Database["public"]["Tables"]["inventory_batches"]["Row"][]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchData();
+    fetchBatches();
   }, []);
 
   const fetchData = async () => {
@@ -79,6 +82,27 @@ const StockReceiving = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory_batches')
+        .select("*");
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setBatches(data);
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 

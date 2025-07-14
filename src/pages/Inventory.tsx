@@ -524,11 +524,11 @@ const Inventory = () => {
 
   const getStatusBadge = (item: InventoryItemWithRelations) => {
     if (item.current_stock === 0) {
-      return <Badge className="status-indicator status-out-of-stock">Out of Stock</Badge>;
+      return <Badge className="status-indicator status-out-of-stock" variant="destructive">Out of Stock</Badge>;
     } else if (item.current_stock <= item.minimum_stock) {
-      return <Badge className="status-indicator status-low-stock">Low Stock</Badge>;
+      return <Badge className="status-indicator status-low-stock" variant="secondary">Low Stock</Badge>;
     } else {
-      return <Badge className="status-indicator status-in-stock">In Stock</Badge>;
+      return <Badge className="status-indicator status-in-stock" variant="default">In Stock</Badge>;
     }
   };
 
@@ -719,29 +719,11 @@ const Inventory = () => {
                       {item.supplier && (
                         <p className="text-sm">Supplier: {item.supplier.name}</p>
                       )}
+                      {item.barcode && (
+                        <p className="text-sm">Barcode: {item.barcode}</p>
+                      )}
                     </div>
                   </CardContent>
-                  {item.track_batches && <CardContent>
-                    <div className="space-y-2">
-                      <p className="text-sm">
-                        Batch Number: {
-                          batches.find(b => b.inventory_item_id === item.id)?.batch_number || "N/A"
-                        }
-                      </p>
-                      <p className="text-sm">
-                        Expiry Date: {
-                          batches.find(b => b.inventory_item_id === item.id)?.expiry_date || "N/A"
-                        }
-                      </p>
-                      <p className="text-sm">
-                        Quantity Remaining: {
-                          batches.find(b => b.inventory_item_id === item.id)?.quantity_remaining || "N/A"
-                        }
-                      </p>
-                      
-                    </div>
-                  </CardContent>}
-
                   <CardContent className="pt-0">
                     <div className="flex justify-end space-x-2">
                       <Button
@@ -1082,10 +1064,12 @@ const Inventory = () => {
               <Label htmlFor="description">Description</Label>
               <Textarea name="description" placeholder="Enter item description" />
             </div>
+            {/*}
             <div className="col-span-2 flex items-center space-x-2">
               <Switch name="trackBatches" />
               <Label htmlFor="trackBatches">Enable batch tracking for this item</Label>
             </div>
+            {*/}
             <div className="col-span-2 flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={() => setIsAddItemOpen(false)}>
                 Cancel
