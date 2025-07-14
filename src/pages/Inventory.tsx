@@ -696,7 +696,7 @@ const Inventory = () => {
                   item.description?.toLowerCase().includes(searchTerm.toLowerCase()))
               )
               .map((item) => (
-                <Card key={item.id} className="flex flex-col">
+                <Card key={item.id} className="flex flex-col self-start min-h-[250px]">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <div>
