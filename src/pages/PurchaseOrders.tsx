@@ -233,7 +233,7 @@ const PurchaseOrders = () => {
                     </div>
                     <div className="flex items-center text-gray-600">
                       <DollarSign className="h-4 w-4 mr-2" />
-                      <span>Total Amount: ${order.total_amount?.toFixed(2)}</span>
+                      <span>Total Amount: LKR {order.total_amount?.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

@@ -168,7 +168,7 @@ const Dashboard = () => {
         // For monthly usage, we would need transaction data
         // This is a placeholder - in a real implementation, you'd calculate this from transactions
         const estimatedMonthlyUsage = itemsData.reduce((sum, item) => sum + (item.unit_price * (item.minimum_stock / 2)), 0);
-        updatedStats[3].value = `Rs. ${Math.round(estimatedMonthlyUsage).toLocaleString()}`;
+        updatedStats[3].value = `LKR ${Math.round(estimatedMonthlyUsage).toLocaleString()}`;
         updatedStats[3].change = "Estimated monthly";
         
         setStats(updatedStats);

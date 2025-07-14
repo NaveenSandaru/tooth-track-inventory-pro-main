@@ -417,7 +417,7 @@ const Reports = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Inventory Value</p>
-                <p className="text-2xl font-bold text-dental-dark">Rs. {quickStats.totalInventoryValue.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-dental-dark">LKR {quickStats.totalInventoryValue.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
