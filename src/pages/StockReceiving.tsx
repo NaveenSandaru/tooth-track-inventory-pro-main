@@ -9,19 +9,31 @@ import { supabase } from "@/integrations/supabase/client";
 import { StockReceivingForm } from "@/components/stock-receiving/StockReceivingForm";
 import { StockReceivingView } from "@/components/stock-receiving/StockReceivingView";
 import { StockItemsView } from "@/components/stock-receiving/StockItemsView";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Plus, 
   Search, 
-  Truck, 
-  Edit, 
+  Package, 
+  FileCheck, 
   Eye, 
-  Package,
-  Calendar,
-  CheckCircle,
+  Edit, 
   AlertTriangle,
-  Upload,
+  CheckCircle,
+  Trash2,
+  Calendar,
+  FileText,
   User,
-  FileText
+  Upload,
+  Truck
 } from "lucide-react";
 
 const StockReceiving = () => {
@@ -30,6 +42,7 @@ const StockReceiving = () => {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isItemsOpen, setIsItemsOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [stockReceipts, setStockReceipts] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -109,6 +122,59 @@ const StockReceiving = () => {
     setSelectedReceipt(receipt);
     setIsItemsOpen(true);
   };
+  
+  // Handler for deleting a receipt
+  const handleDeleteReceipt = (receipt) => {
+    setSelectedReceipt(receipt);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  // Function to execute the deletion
+  const executeDelete = async () => {
+    if (!selectedReceipt) return;
+    
+    try {
+      setLoading(true);
+      
+      // First delete all stock receipt items
+      const { error: itemsError } = await supabase
+        .from('stock_receipt_items')
+        .delete()
+        .eq('stock_receipt_id', selectedReceipt.id);
+      
+      if (itemsError) throw itemsError;
+      
+      // Then delete the stock receipt itself
+      const { error: receiptError } = await supabase
+        .from('stock_receipts')
+        .delete()
+        .eq('id', selectedReceipt.id);
+      
+      if (receiptError) throw receiptError;
+      
+      // Show success message
+      toast({
+        title: "Success",
+        description: `Stock receipt ${selectedReceipt.receipt_number} has been deleted.`,
+        variant: "default"
+      });
+      
+      // Refresh data
+      fetchData();
+      
+    } catch (error) {
+      console.error('Error deleting stock receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete stock receipt.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setSelectedReceipt(null);
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -119,7 +185,7 @@ const StockReceiving = () => {
         </div>
         
         <Button 
-          className="bg-dental-primary hover:bg-dental-secondary"
+          className="bg-primary hover:bg-secondary"
           onClick={() => setIsAddOpen(true)}
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -233,7 +299,6 @@ const StockReceiving = () => {
                   onClick={() => handleViewReceipt(receipt)}
                 >
                   <Eye className="h-4 w-4 mr-1" />
-                  View
                 </Button>
                 <Button 
                   variant="outline" 
@@ -242,7 +307,6 @@ const StockReceiving = () => {
                   onClick={() => handleEditReceipt(receipt)}
                 >
                   <Edit className="h-4 w-4 mr-1" />
-                  Edit
                 </Button>
                 <Button 
                   variant="outline" 
@@ -251,7 +315,17 @@ const StockReceiving = () => {
                   onClick={() => handleViewItems(receipt)}
                 >
                   <Package className="h-4 w-4 mr-1" />
-                  Items
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1 text-red-500 hover:bg-red-50 hover:text-red-600"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteReceipt(receipt);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
                 </Button>
               </div>
 
@@ -278,7 +352,7 @@ const StockReceiving = () => {
             </p>
             {!searchTerm && (
               <Button 
-                className="bg-dental-primary hover:bg-dental-secondary"
+                className="bg-primary hover:bg-secondary"
                 onClick={() => setIsAddOpen(true)}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -321,6 +395,50 @@ const StockReceiving = () => {
         isOpen={isItemsOpen}
         onOpenChange={setIsItemsOpen}
       />
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600 flex items-center">
+              <Trash2 className="h-5 w-5 mr-2" />
+              Delete Stock Receipt
+            </AlertDialogTitle>
+            <AlertDialogDescription className="pt-3">
+              {selectedReceipt && (
+                <>
+                  <p className="mb-4">Are you sure you want to delete this stock receipt?</p>
+                  <div className="bg-gray-50 p-3 rounded-md mb-4 border-l-4 border-red-400">
+                    <p className="font-medium">{selectedReceipt.receipt_number}</p>
+                    <p className="text-sm text-gray-600">
+                      Supplier: {selectedReceipt.suppliers?.name || 'Unknown'}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Date: {new Date(selectedReceipt.receipt_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <p className="text-red-500 text-sm">
+                    This will permanently delete the receipt and all its items.
+                    This action cannot be undone.
+                  </p>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-red-600 hover:bg-red-700 text-white" 
+              onClick={executeDelete}
+              disabled={loading}
+            >
+              {loading ? 'Deleting...' : 'Delete Receipt'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

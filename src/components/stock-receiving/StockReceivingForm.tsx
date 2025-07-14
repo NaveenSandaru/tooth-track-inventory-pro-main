@@ -970,7 +970,7 @@ export const StockReceivingForm = ({
               {readOnly ? 'Close' : 'Cancel'}
             </Button>
             {!readOnly && (
-              <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+              <Button type="submit" className="bg-primary hover:bg-secondary">
                 {initialData ? 'Update Receipt' : 'Save Receipt'}
               </Button>
             )}
