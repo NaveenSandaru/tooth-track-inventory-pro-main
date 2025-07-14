@@ -39,7 +39,7 @@ const menuItems = [
   { title: "Equipment", url: "/equipment", icon: Stethoscope },
   { title: "Suppliers", url: "/suppliers", icon: Shield },
   { title: "Reports", url: "/reports", icon: FileText },
-  { title: "Settings", url: "/settings", icon: Settings },
+ /* { title: "Settings", url: "/settings", icon: Settings },*/
   { title: "Back To Admin Portal", url: "http://localhost:3001", icon: ArrowBigLeft },
 ];
 
@@ -55,8 +55,8 @@ export function AppSidebar() {
       {isMobile && (
         <Button
           variant="ghost"
-          size="icon"
-          className="md:hidden fixed top-4 left-4 z-[100] bg-white shadow-md border"
+          size="sm"
+          className="md:hidden fixed top-4 left-4 z-[50] bg-white border"
           onClick={() => setOpenMobile(true)}
         >
           <Menu className="h-5 w-5" />
