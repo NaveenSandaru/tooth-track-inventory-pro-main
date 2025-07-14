@@ -569,7 +569,7 @@ const Inventory = () => {
         <TabsContent value="items" className="space-y-4">
           {/* Existing items content */}
           <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-2 justify-end">
-            <Button onClick={() => setIsScannerOpen(true)}>
+            <Button onClick={() => setIsScannerOpen(true)} className="bg-green-500 hover:bg-green-600">
               <Scan className="h-4 w-4 mr-2" />
               Scan Item
             </Button>
@@ -682,10 +682,10 @@ const Inventory = () => {
 
         <TabsContent value="categories">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 pb-2">
               <CardTitle>Categories</CardTitle>
-              <div className="flex items-center space-x-2">
-                <Button onClick={() => setIsAddCategoryOpen(true)} className="bg-emerald-600 hover:bg-emerald-500">
+              <div className="flex items-center space-x-2 w-full md:w-auto">
+                <Button onClick={() => setIsAddCategoryOpen(true)} className="bg-emerald-600 hover:bg-emerald-500 w-full md:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Category
                 </Button>
@@ -727,10 +727,10 @@ const Inventory = () => {
 
         <TabsContent value="parent-categories">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 pb-2">
               <CardTitle>Parent Categories</CardTitle>
-              <div className="flex items-center space-x-2">
-                <Button onClick={() => setIsAddParentCategoryOpen(true)} className="bg-emerald-600 hover:bg-emerald-500">
+              <div className="flex items-center space-x-2 w-full md:w-auto">
+                <Button onClick={() => setIsAddParentCategoryOpen(true)} className="bg-emerald-600 hover:bg-emerald-500 w-full md:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Parent Category
                 </Button>
@@ -867,149 +867,93 @@ const Inventory = () => {
 
       {/* Add Item Dialog */}
       <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Item</DialogTitle>
-            <DialogDescription>
-              Add a new item to your inventory
-            </DialogDescription>
+            <DialogDescription>Add a new item to your inventory</DialogDescription>
           </DialogHeader>
           <form onSubmit={(e: React.FormEvent) => { 
             e.preventDefault(); 
             const form = e.target as HTMLFormElement;
             addItem(Object.fromEntries(new FormData(form))); 
-          }} className="space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Item Name *</Label>
-                <Input id="name" name="name" required placeholder="Enter item name" />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea id="description" name="description" placeholder="Enter item description" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="categoryId">Category *</Label>
-                  <Select name="categoryId" required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="supplierId">Supplier *</Label>
-                  <Select name="supplierId" required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentStock">Current Stock *</Label>
-                  <Input
-                    id="currentStock"
-                    name="currentStock"
-                    type="number"
-                    min="0"
-                    required
-                    placeholder="Enter current stock"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="minimumStock">Minimum Stock *</Label>
-                  <Input
-                    id="minimumStock"
-                    name="minimumStock"
-                    type="number"
-                    min="0"
-                    required
-                    placeholder="Enter minimum stock"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="unit">Unit of Measurement *</Label>
-                  <Input
-                    id="unit"
-                    name="unit"
-                    required
-                    placeholder="e.g., pieces, boxes"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="unitPrice">Unit Price *</Label>
-                  <Input
-                    id="unitPrice"
-                    name="unitPrice"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    placeholder="Enter unit price"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="location">Storage Location</Label>
-                <Input
-                  id="location"
-                  name="location"
-                  placeholder="Enter storage location"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Switch id="trackBatches" name="trackBatches" />
-                  <Label htmlFor="trackBatches">Track Batches</Label>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="alertExpiryDays">Alert Days Before Expiry</Label>
-                <Input
-                  id="alertExpiryDays"
-                  name="alertExpiryDays"
-                  type="number"
-                  min="0"
-                  placeholder="Default: 30 days"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsAddItemOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500">
-                  Add Item
-                </Button>
-              </div>
+          }} className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Item Name *</Label>
+              <Input name="name" required placeholder="Enter item name" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="categoryId">Category *</Label>
+              <Select name="categoryId" required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {getCategoryDisplayName(category.id)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="currentStock">Current Stock *</Label>
+              <Input name="currentStock" type="number" min="0" required placeholder="Enter current stock" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="minimumStock">Minimum Stock *</Label>
+              <Input name="minimumStock" type="number" min="0" required placeholder="Enter minimum stock" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit">Unit of Measurement</Label>
+              <Input name="unit" placeholder="e.g., pieces, boxes" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unitPrice">Unit Price (Rs. )</Label>
+              <Input name="unitPrice" type="number" step="0.01" min="0" placeholder="Enter unit price" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplierId">Supplier</Label>
+              <Select name="supplierId">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="location">Storage Location</Label>
+              <Input name="location" placeholder="Enter storage location" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="barcode">Barcode/SKU</Label>
+              <Input name="barcode" placeholder="Enter barcode or SKU" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="alertExpiryDays">Expiry Alert Days</Label>
+              <Input name="alertExpiryDays" type="number" min="0" placeholder="Default: 30 days" />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea name="description" placeholder="Enter item description" />
+            </div>
+            <div className="col-span-2 flex items-center space-x-2">
+              <Switch name="trackBatches" />
+              <Label htmlFor="trackBatches">Enable batch tracking for this item</Label>
+            </div>
+            <div className="col-span-2 flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={() => setIsAddItemOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-primary hover:bg-secondary">
+                Add Item
+              </Button>
             </div>
           </form>
         </DialogContent>
@@ -1193,7 +1137,7 @@ const Inventory = () => {
                 <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-dental-primary hover:bg-dental-secondary">
+                <Button type="submit" className="bg-primary hover:bg-secondary">
                   Save Changes
                 </Button>
               </div>
