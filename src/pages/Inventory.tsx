@@ -524,11 +524,11 @@ const Inventory = () => {
 
   const getStatusBadge = (item: InventoryItemWithRelations) => {
     if (item.current_stock === 0) {
-      return <Badge className="status-indicator status-out-of-stock">Out of Stock</Badge>;
+      return <Badge className="status-indicator status-out-of-stock" variant="destructive">Out of Stock</Badge>;
     } else if (item.current_stock <= item.minimum_stock) {
-      return <Badge className="status-indicator status-low-stock">Low Stock</Badge>;
+      return <Badge className="status-indicator status-low-stock" variant="secondary">Low Stock</Badge>;
     } else {
-      return <Badge className="status-indicator status-in-stock">In Stock</Badge>;
+      return <Badge className="status-indicator status-in-stock" variant="default">In Stock</Badge>;
     }
   };
 
