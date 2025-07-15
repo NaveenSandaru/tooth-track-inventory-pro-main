@@ -108,8 +108,6 @@ export function AppSidebar() {
                           <a
                             href={item.url}
                             className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-all duration-200 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                            target="_blank"
-                            rel="noopener noreferrer"
                           >
                             <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? "text-emerald-600" : "text-gray-500"}`} />
                             {!collapsed && <span>{item.title}</span>}
