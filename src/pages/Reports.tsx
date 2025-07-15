@@ -475,7 +475,7 @@ const Reports = () => {
 
       {/* Reports Tabs */}
       <Tabs defaultValue="stock" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="stock" className="hover:bg-gray-200 hover:text-gray-900">Stock Reports</TabsTrigger>
           <TabsTrigger value="usage" className="hover:bg-gray-200 hover:text-gray-900">Usage Analytics</TabsTrigger>
           <TabsTrigger value="purchasing" className="hover:bg-gray-200 hover:text-gray-900">Purchase Reports</TabsTrigger>
