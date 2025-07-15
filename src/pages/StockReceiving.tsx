@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,7 +65,7 @@ const StockReceiving = () => {
           purchase_orders(po_number),
           stock_receipt_items(*, inventory_items(id, name))
         `).order('created_at', { ascending: false }),
-        supabase.from('purchase_orders').select('*').eq('status', 'ordered').order('po_number'),
+        supabase.from('purchase_orders').select('*').neq('status', 'received').order('po_number'),
         supabase.from('suppliers').select('*').order('name')
       ]);
 

@@ -58,7 +58,7 @@ export const PurchaseOrderForm = ({
     item_code: '',
     item_description: '',
     category: '',
-    quantity: 1,
+    quantity: 0,
     unit_of_measure: 'units',
     unit_price: 0,
     total_price: 0,
@@ -128,7 +128,7 @@ export const PurchaseOrderForm = ({
       item_code: '',
       item_description: '',
       category: '',
-      quantity: 1,
+      quantity: 0,
       unit_of_measure: 'units',
       unit_price: 0,
       total_price: 0,
@@ -168,7 +168,7 @@ export const PurchaseOrderForm = ({
               updatedItem.category = selectedItem.category_id || '';
               updatedItem.unit_of_measure = selectedItem.unit_of_measurement;
               updatedItem.unit_price = Number(selectedItem.unit_price) || 0;
-              updatedItem.total_price = Number(updatedItem.quantity || 1) * Number(selectedItem.unit_price || 0);
+              updatedItem.total_price = Number(updatedItem.quantity || 0) * Number(selectedItem.unit_price || 0);
               
               console.log('Updated item with inventory data:', updatedItem);
             } else {
@@ -345,7 +345,7 @@ export const PurchaseOrderForm = ({
         item_code: '',
         item_description: '',
         category: '',
-        quantity: 1,
+        quantity: 0,
         unit_of_measure: 'units',
         unit_price: 0,
         total_price: 0,
@@ -668,7 +668,7 @@ export const PurchaseOrderForm = ({
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
-                        min="1"
+                        min="0"
                         value={item.quantity}
                         onChange={(e) => updateOrderItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
                         className={errors[`item_${index}_quantity`] ? "border-red-500" : ""}
