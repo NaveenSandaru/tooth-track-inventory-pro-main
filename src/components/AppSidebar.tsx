@@ -40,7 +40,7 @@ const menuItems = [
   { title: "Suppliers", url: "/suppliers", icon: Shield },
   { title: "Reports", url: "/reports", icon: FileText },
  /* { title: "Settings", url: "/settings", icon: Settings },*/
-  { title: "Back To Admin Portal", url: "http://localhost:3001", icon: ArrowBigLeft },
+  { title: "Back To Admin Portal", url: "https://dentax.globalpearlventures.com", icon: ArrowBigLeft },
 ];
 
 export function AppSidebar() {
