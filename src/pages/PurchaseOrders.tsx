@@ -9,13 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PurchaseOrderForm } from "@/components/purchase-orders/PurchaseOrderForm";
 import { PurchaseOrderViewDialog } from "@/components/purchase-orders/PurchaseOrderViewDialog";
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  FileText, 
-  Edit, 
-  Eye, 
+import {
+  Plus,
+  Search,
+  Filter,
+  FileText,
+  Edit,
+  Eye,
   Truck,
   Calendar,
   DollarSign,
@@ -149,8 +149,8 @@ const PurchaseOrders = () => {
 
   const filteredOrders = purchaseOrders.filter((order: any) => {
     const matchesSearch = order.po_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.suppliers?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.requested_by?.toLowerCase().includes(searchTerm.toLowerCase());
+      order.suppliers?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.requested_by?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -166,8 +166,8 @@ const PurchaseOrders = () => {
           <h1 className="text-3xl font-bold text-dental-dark">Purchase Orders</h1>
           <p className="text-gray-600 mt-1">Manage purchase orders and procurement workflow</p>
         </div>
-        
-        <Button 
+
+        <Button
           className="bg-primary hover:bg-secondary"
           onClick={() => setIsAddOpen(true)}
         >
@@ -217,7 +217,7 @@ const PurchaseOrders = () => {
                     <h3 className="text-lg font-semibold">{order.po_number}</h3>
                     {getStatusBadge(order.status)}
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center text-gray-600">
                       <User className="h-4 w-4 mr-2" />
@@ -239,8 +239,8 @@ const PurchaseOrders = () => {
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => {
                       setSelectedPurchaseOrder(order.id);
@@ -250,8 +250,8 @@ const PurchaseOrders = () => {
                     <Eye className="h-4 w-4 mr-2" />
                     View
                   </Button>
-                  
-                  {order.status === 'pending' && (
+
+                  {!(order.status === 'ordered' || order.status === 'received') && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -261,7 +261,8 @@ const PurchaseOrders = () => {
                       Approve
                     </Button>
                   )}
-                  
+
+
                   {order.status === 'approved' && (
                     <Button
                       variant="outline"
@@ -272,15 +273,16 @@ const PurchaseOrders = () => {
                       Mark as Ordered
                     </Button>
                   )}
-                  
+
                   {order.status === 'ordered' && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => updatePOStatus(order.id, 'received')}
+                      onClick={() => console.log('Receive Order')}
+                      disabled
                     >
                       <Truck className="h-4 w-4 mr-2" />
-                      Mark as Received
+                      Go to StockReceiving
                     </Button>
                   )}
                 </div>
